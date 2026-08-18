@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Forest Project Control</title>
+  <meta name="description" content="Dashboard ติดตามความก้าวหน้าและการเบิกจ่ายโครงการปลูกป่า" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <div class="brand-mark" aria-hidden="true">🌱</div>
+      <div>
+        <div class="eyebrow">PROJECT CONTROL</div>
+        <h1>Forest Project Dashboard</h1>
+      </div>
+    </div>
+    <div class="asof" id="asOf"></div>
+  </header>
+
+  <nav class="tabs" aria-label="Dashboard sections">
+    <button class="tab active" data-view="overview">ภาพรวม</button>
+    <button class="tab" data-view="schedule">ติดตามงาน</button>
+    <button class="tab" data-view="payments">เงิน / สัญญา</button>
+    <button class="tab" data-view="quality">Data Quality</button>
+  </nav>
+
+  <main>
+    <section class="filters card" id="filters">
+      <div class="filter-field search-field">
+        <label for="searchInput">ค้นหา</label>
+        <input id="searchInput" type="search" placeholder="แปลง, สัญญา, จังหวัด, ผู้รับเหมา..." />
+      </div>
+      <div class="filter-field">
+        <label for="provinceFilter">จังหวัด</label>
+        <select id="provinceFilter"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="filter-field">
+        <label for="riskFilter">สถานะงาน</label>
+        <select id="riskFilter">
+          <option value="">ทั้งหมด</option>
+          <option value="critical">วิกฤต</option>
+          <option value="high">เสี่ยงสูง</option>
+          <option value="watch">เฝ้าระวัง</option>
+          <option value="on_track">ตามแผน</option>
+          <option value="ahead">เร็วกว่าแผน</option>
+        </select>
+      </div>
+      <label class="toggle-field">
+        <input id="followupOnly" type="checkbox" />
+        <span>เฉพาะรายการที่ต้องติดตาม</span>
+      </label>
+      <div class="filter-actions">
+        <button class="btn secondary" id="resetFilters">ล้างตัวกรอง</button>
+        <button class="btn" id="exportCsv">Export CSV</button>
+      </div>
+    </section>
+
+    <section id="overviewView" class="view active"></section>
+    <section id="scheduleView" class="view"></section>
+    <section id="paymentsView" class="view"></section>
+    <section id="qualityView" class="view"></section>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="ปิด">×</button>
+      <div id="modalContent"></div>
+    </article>
+  </div>
+
+  <script src="data/project-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
