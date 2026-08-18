@@ -1,0 +1,6 @@
+# Raw company data: do not commit to the public repository
+*.xlsx
+*.xls
+*.csv
+.DS_Store
+__pycache__/
