@@ -7,8 +7,8 @@ Dashboard สำหรับติดตามโครงการปลูก/
 - แปลง/สัญญาไหน **ช้ากว่าแผน** และควรติดตามก่อน
 - จากมูลค่าสัญญา 100% ตอนนี้ **Progress งานกี่ %**
 - ERP มีรายการปีที่ 3 แล้ว **กี่ % ของสัญญา**
-- จุดไหนที่ **ERP นำหน้างาน / ต่ำกว่างาน / ต้องตรวจ Voucher**
-- Drill-down ลงไปดู **งวดงาน** และ **AP voucher** ของแต่ละแปลง
+- จุดไหนที่ **ERP นำหน้างาน / ต่ำกว่างาน / ต้องตรวจข้อมูลปี 2/3**
+- Drill-down ดู **Plan / Progress / ERP summary** ของแต่ละสัญญา
 
 ## Snapshot ปัจจุบัน
 
@@ -17,7 +17,7 @@ Dashboard สำหรับติดตามโครงการปลูก/
 - `Progress TC งาน ปีที่ 3 อัพเดท 18.08.2569.xlsx`
 - `Export v_gl_rpt313 (bbb48a) 05.08.2569(1).xlsx`
 
-Raw Excel **ไม่ได้ commit** เข้า repository นี้ เพราะ repository เป็น public. Dashboard ใช้ข้อมูลสรุปใน `data/project-data.js`.
+Raw Excel **ไม่ได้ commit** เข้า repository นี้ เพราะ repository เป็น public. Public dataset เก็บเฉพาะข้อมูลสรุประดับแปลง/สัญญา/AP และไม่เผย Voucher ID หรือ Remark ดิบ.
 
 ตัวเลขหลัก ณ snapshot นี้:
 
@@ -39,11 +39,11 @@ python -m http.server 8000
 
 แล้วเปิด `http://localhost:8000`
 
-หรือเปิดผ่าน GitHub Pages หลังเปิด Pages / รัน workflow `.github/workflows/pages.yml`.
+หรือเปิดผ่าน GitHub Pages ด้วย workflow `.github/workflows/pages.yml`.
 
 ## Refresh ข้อมูลเมื่อมี Excel รอบใหม่
 
-ใช้สคริปต์ ETL ที่ไม่ต้องติดตั้ง package เพิ่ม:
+ใช้สคริปต์ ETL ที่ใช้ Python standard library เท่านั้น:
 
 ```bash
 python scripts/build_data.py \
@@ -52,7 +52,13 @@ python scripts/build_data.py \
   --output data/project-data.js
 ```
 
-จากนั้นเปิด dashboard เพื่อตรวจตัวเลข แล้ว commit เฉพาะ `data/project-data.js` — ไม่ควร commit raw ERP export.
+สคริปต์จะสร้าง `data/project-data.js` และ `data/plots-*.js` ใหม่ทั้งหมด จากนั้นตรวจ reconciliation ก่อน commit:
+
+```bash
+node scripts/validate_dashboard.js
+```
+
+GitHub Pages workflow จะรัน validator นี้ก่อน deploy ทุกครั้ง. ไม่ควร commit raw ERP/Progress Excel ขึ้น public repository.
 
 ## Logic สำคัญ
 
@@ -64,7 +70,7 @@ python scripts/build_data.py \
 - `Delay Value = max(Plan ฿ - Progress ฿, 0)`
 - ลำดับการติดตามใช้ Delay Value เป็นหลัก เพื่อให้แปลงที่ช้าและมีมูลค่าสูงขึ้นก่อน
 
-Risk rule ใน MVP:
+Risk rule:
 
 - Critical: ช้ากว่า ≥ 25 จุด หรือ ≥ 90 วัน
 - High: ช้ากว่า ≥ 10 จุด หรือ ≥ 30 วัน
@@ -74,12 +80,7 @@ Risk rule ใน MVP:
 
 ### Contract mapping
 
-Plot ID รองรับทั้งรูปแบบปกติและ suffix เช่น:
-
-- `14-STC`
-- `14(1)-STC`
-- `71-VSD`
-- `71(1)-VSD`
+Plot ID รองรับทั้งรูปแบบปกติและ suffix เช่น `14-STC`, `14(1)-STC`, `71-VSD`, `71(1)-VSD`.
 
 ใช้ exact Plot ID เพื่อดึง Contract No., WO และ Vendor จาก ERP จึงไม่เอา plot `(1)` ไปปนกับ plot หลัก.
 
@@ -97,5 +98,6 @@ Plot ID รองรับทั้งรูปแบบปกติและ su
 
 - ERP มี 2 worksheet ที่ข้อมูลเหมือนกันทุกแถว → ใช้ worksheet แรกเพียงชุดเดียว ป้องกัน double count
 - Plot ใน Progress 151 รายการสามารถ map ไป ERP เพื่อหา Contract/Vendor ได้ครบ
-- Voucher ที่ปนปี 2/3 ถูกแยกเป็น ambiguous ไม่ถูกบังคับ allocate
+- รายการที่ปนปี 2/3 ถูกแยกเป็น ambiguous ไม่ถูกบังคับ allocate
 - Raw files ถูก `.gitignore` เพื่อป้องกันการเผลอ push ข้อมูลบริษัทขึ้น public repo
+- Validator ตรวจจำนวน Plot, Plot ID ซ้ำ และ reconciliation ของ Contract / Plan / Progress ก่อน deploy
