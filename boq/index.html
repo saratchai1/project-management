@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0f172a">
-  <title>BOQ Explorer | Forest Project Control</title>
-  <meta name="description" content="เว็บแอปสำรวจมูลค่า BOQ รายแปลง รายปี และรายงวด">
+  <meta name="theme-color" content="#0b3b35">
+  <title>Project Finance Control | Forest Project</title>
+  <meta name="description" content="ติดตาม BOQ ยอดจ่ายและคงเหลือ โดยเริ่มจากรหัสโครงการและเจาะลงถึงรายแปลง">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
     <div>
-      <div class="eyebrow">FOREST PROJECT CONTROL / BOQ</div>
-      <h1>BOQ Contract Value Explorer</h1>
-      <p>มูลค่างานรายแปลง • ปี 1–10 • งวดงาน 1–4</p>
+      <div class="eyebrow">PROJECT CODE → PORTFOLIO → PLOT → INSTALLMENT</div>
+      <h1>Project Finance Control</h1>
+      <p>ติดตามมูลค่าสัญญา จ่ายแล้ว คงเหลือ และงวดที่ต้องเร่งรัด</p>
     </div>
     <nav class="topnav">
       <a href="../">Project Dashboard</a>
@@ -24,17 +24,25 @@
 
   <main class="shell">
     <section class="notice">
-      <strong>ข้อมูลนี้คือมูลค่า BOQ</strong>
-      <span>ไม่ใช่ยอดจ่ายจริงจาก ERP — ใช้เชื่อมกับ Progress/ERP ด้วย Plot ID และ Contract No.</span>
+      <div><strong>หลักการจับข้อมูลใหม่</strong><span>เริ่มจากรหัสโครงการ แล้ว Tag ประเภทงาน ก่อนผูกกับรหัสแปลงและเลขสัญญา</span></div>
+      <button class="btn" id="openAllSpend">ดูเงินจ่ายแล้วทุกหมวดหมู่</button>
     </section>
 
-    <section class="filters panel" aria-label="ตัวกรอง">
-      <div class="field grow">
+    <section class="panel filters" aria-label="ตัวกรอง">
+      <div class="field wide">
         <label for="search">ค้นหา</label>
-        <input id="search" type="search" placeholder="แปลง, สัญญา, จังหวัด, ตำบล, โครงการ...">
+        <input id="search" type="search" placeholder="รหัสโครงการ, แปลง, สัญญา, จังหวัด, ชื่อ T-VER...">
       </div>
       <div class="field">
-        <label for="year">ปีงาน</label>
+        <label for="portfolio">ประเภทโครงการ</label>
+        <select id="portfolio"></select>
+      </div>
+      <div class="field">
+        <label for="projectCode">รหัสโครงการ</label>
+        <select id="projectCode"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="field">
+        <label for="year">ปีดำเนินงาน</label>
         <select id="year"></select>
       </div>
       <div class="field">
@@ -46,60 +54,57 @@
         <select id="province"><option value="">ทั้งหมด</option></select>
       </div>
       <div class="field">
-        <label for="token">ประเภท</label>
+        <label for="token">TOKEN</label>
         <select id="token"><option value="">ทั้งหมด</option></select>
       </div>
       <button class="btn secondary" id="reset">ล้างตัวกรอง</button>
     </section>
 
+    <section class="portfolio-grid" id="portfolioCards"></section>
+
     <section class="kpis" id="kpis"></section>
 
     <section class="grid-2">
-      <article class="panel chart-card">
-        <div class="section-head"><div><h2>BOQ รายปี</h2><p>มูลค่ารวมของแปลงที่ผ่านตัวกรอง</p></div></div>
-        <div id="yearChart" class="year-chart"></div>
+      <article class="panel">
+        <div class="section-head"><div><h2>สถานะรายปี</h2><p>BOQ เทียบ ERP AP ของแปลงที่ผ่านตัวกรอง</p></div></div>
+        <div id="yearBars" class="year-bars"></div>
       </article>
-      <article class="panel chart-card">
-        <div class="section-head"><div><h2 id="installmentTitle">สัดส่วนงวด</h2><p>รวมมูลค่างวด 1–4 ของปีที่เลือก</p></div></div>
-        <div id="installmentChart"></div>
-      </article>
-    </section>
-
-    <section class="grid-2">
-      <article class="panel chart-card">
-        <div class="section-head"><div><h2>ผู้รับเหมา</h2><p>มูลค่า BOQ 10 ปีตามบริษัท</p></div></div>
-        <div id="companyChart"></div>
-      </article>
-      <article class="panel chart-card">
-        <div class="section-head"><div><h2>จังหวัดมูลค่าสูงสุด</h2><p>เรียงตาม BOQ 10 ปี</p></div></div>
-        <div id="provinceChart"></div>
+      <article class="panel">
+        <div class="section-head"><div><h2>แยกประเภทงานตามรหัสโครงการ</h2><p>งานที่ไม่มี BOQ ตายตัวแสดงเป็นยอดสะสมถึงวันที่ ERP ล่าสุด</p></div></div>
+        <div id="workTypeBars" class="work-bars"></div>
       </article>
     </section>
 
-    <section class="panel table-panel">
+    <section class="panel code-panel">
+      <div class="section-head"><div><h2>Project Code Register</h2><p>รหัสโครงการคือจุดตั้งต้นในการ Tag รายการเงิน</p></div></div>
+      <div class="table-wrap">
+        <table class="compact">
+          <thead><tr><th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ผู้รับเหมา</th><th class="num">ปลูก/บำรุง</th><th class="num">PDD</th><th class="num">VVB</th><th class="num">ลงพื้นที่</th><th class="num">ตรวจรอดตาย</th><th class="num">กองทุนชุมชน</th><th class="num">รวม AP</th></tr></thead>
+          <tbody id="codeRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel table-panel" id="plotPanel">
       <div class="section-head table-head">
-        <div><h2>รายละเอียดรายแปลง</h2><p id="tableSubtitle"></p></div>
+        <div><h2>ติดตามรายแปลง</h2><p id="tableSubtitle"></p></div>
         <div class="table-actions">
-          <label>เรียงตาม
-            <select id="sort">
-              <option value="total10y">มูลค่า 10 ปี</option>
-              <option value="yearValue">มูลค่าปีที่เลือก</option>
-              <option value="area">พื้นที่</option>
-              <option value="id">รหัสแปลง</option>
-            </select>
-          </label>
+          <label>เรียงตาม <select id="sort"><option value="balance">คงเหลือสูงสุด</option><option value="paid">จ่ายแล้วสูงสุด</option><option value="boq">BOQ สูงสุด</option><option value="plot">รหัสแปลง</option></select></label>
           <button class="btn" id="exportCsv">Export CSV</button>
         </div>
       </div>
-      <div class="table-wrap">
+      <div id="plotUnavailable" class="empty-state" hidden></div>
+      <div class="table-wrap" id="plotTableWrap">
         <table>
-          <thead><tr><th>แปลง</th><th>ผู้รับเหมา</th><th>จังหวัด</th><th class="num">พื้นที่ (ไร่)</th><th>สัญญา</th><th class="num" id="yearCol">ปี 3</th><th class="num">รวม 10 ปี</th><th></th></tr></thead>
+          <thead><tr>
+            <th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ชื่อ T-VER</th><th>TOKEN</th><th>รหัสแปลง</th><th>จังหวัด</th><th class="num">พื้นที่</th><th class="num" id="boqYearHead">BOQ ปี 3</th><th>งวดล่าสุด</th><th>งวดค้าง</th><th class="num">จ่ายแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th></th>
+          </tr></thead>
           <tbody id="plotRows"></tbody>
         </table>
       </div>
     </section>
 
-    <footer><span id="sourceNote"></span><span>ค่าจริงของแต่ละงวดจาก workbook ถูกใช้เป็นหลัก รวมถึงแปลงที่ต่างจาก header template</span></footer>
+    <footer><span id="sourceNote"></span><span>ยอดจ่ายระดับแปลงใช้ AP ที่ Tag เป็นงานปลูก/บำรุง และไม่รวม Clear Advance/PDD/VVB</span></footer>
   </main>
 
   <div class="modal-backdrop" id="modalBackdrop" hidden>
