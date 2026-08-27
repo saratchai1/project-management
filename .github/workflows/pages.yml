@@ -26,6 +26,8 @@ jobs:
         run: node scripts/validate_dashboard.js
       - name: Validate work monitor data
         run: node work-monitor/validate.js
+      - name: Validate project finance data
+        run: node boq/validate.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
