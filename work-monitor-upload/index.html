@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d332d">
+  <title>Work Progress Monitor · Upload Excel</title>
+  <meta name="description" content="อัปโหลด Excel เพื่อติดตามความก้าวหน้างานรายแปลงและรายงวด">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <div class="eyebrow">FIELD OPERATIONS CONTROL · UPLOAD VERSION</div>
+      <h1>Work Progress Monitor</h1>
+      <p>อัปโหลด Excel รอบใหม่ แล้วสร้าง dashboard ติดตามงานรายแปลงอัตโนมัติ</p>
+    </div>
+    <div class="snapshot" id="snapshot">ยังไม่ได้เลือกไฟล์</div>
+  </header>
+
+  <main>
+    <section class="upload-card card" id="uploadCard">
+      <div class="upload-copy">
+        <span class="upload-kicker">EXCEL → DASHBOARD</span>
+        <h2>อัปโหลดไฟล์ Monitor</h2>
+        <p>รองรับไฟล์ที่มี sheet เช่น “ปีที่ 4”, “ปีที่ 5” และโครงสร้างใกล้เคียงกับไฟล์ Monitor ปัจจุบัน</p>
+      </div>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.xlsb" hidden>
+        <span class="upload-icon">↑</span>
+        <strong>เลือกไฟล์ Excel หรือลากไฟล์มาวาง</strong>
+        <small>.xlsx / .xls / .xlsm / .xlsb</small>
+      </label>
+      <div class="privacy-note"><b>ข้อมูลไม่ถูกอัปโหลดขึ้น server</b> — browser อ่านไฟล์บนเครื่องของผู้ใช้และสร้าง dashboard ในหน้านี้เท่านั้น</div>
+    </section>
+
+    <section class="loading card" id="loading" hidden>
+      <div class="spinner"></div>
+      <div><strong>กำลังอ่าน Excel…</strong><p>ตรวจหา sheet ปีงานและแปลง/งวด</p></div>
+    </section>
+
+    <section class="error-card card" id="errorCard" hidden></section>
+
+    <div id="dashboard" hidden>
+      <section class="file-bar card">
+        <div><span class="file-label">ไฟล์ปัจจุบัน</span><strong id="fileName"></strong><small id="fileMeta"></small></div>
+        <div class="file-actions"><button class="btn ghost" id="qualityBtn">Data Quality</button><button class="btn" id="changeFile">เปลี่ยนไฟล์</button></div>
+      </section>
+
+      <nav class="year-nav card" id="yearNav" aria-label="เลือกปีงาน"></nav>
+
+      <section class="filters card">
+        <div class="field search-field"><label for="search">ค้นหาแปลง</label><input id="search" type="search" placeholder="เช่น 37-STC, กระบี่..."></div>
+        <div class="field"><label for="province">จังหวัด</label><select id="province"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label for="risk">ระดับติดตาม</label><select id="risk">
+          <option value="">ทั้งหมด</option>
+          <option value="critical">วิกฤต · เร่งทันที</option>
+          <option value="high">เสี่ยงสูง · ต้องเร่ง</option>
+          <option value="watch">เฝ้าระวัง</option>
+          <option value="on_track">ตามแผน</option>
+          <option value="future">ยังไม่ถึงแผน</option>
+          <option value="completed">ปิดงานแล้ว</option>
+        </select></div>
+        <label class="urgent-toggle"><input id="urgentOnly" type="checkbox"> <span>เฉพาะที่ต้องเร่ง</span></label>
+        <button class="btn ghost" id="reset">ล้างตัวกรอง</button>
+      </section>
+
+      <nav class="view-nav card" aria-label="มุมมอง Dashboard">
+        <button class="view-btn active" data-view="overview">ภาพรวม</button>
+        <button class="view-btn" data-view="tracking">ติดตามงาน</button>
+      </nav>
+
+      <div id="overviewContent" class="view-content active">
+        <section class="kpis" id="kpis"></section>
+
+        <section class="card panel risk-panel">
+          <div class="panel-head"><div><h2>Risk Distribution</h2><p>นับเป็น “แปลง” · วางเมาส์ดูรายชื่อ · คลิกเพื่อกรองและไปติดตามงาน</p></div></div>
+          <div id="riskChart"></div>
+        </section>
+
+        <section class="card panel action-panel">
+          <div class="panel-head"><div><h2>รายการที่ควรเร่งก่อน</h2><p>เรียงจากระดับความเสี่ยง + Gap + จำนวนวันช้า</p></div><span class="live-pill">ACTION QUEUE</span></div>
+          <div id="actionQueue" class="action-list"></div>
+        </section>
+
+        <section class="card panel province-panel">
+          <div class="panel-head"><div><h2>จังหวัดที่ต้องจับตา</h2><p>ดูสัดส่วนแปลงที่ต้องเร่งในแต่ละจังหวัด · คลิกเพื่อกรอง</p></div></div>
+          <div id="provinceHealth" class="province-list"></div>
+        </section>
+
+        <section class="note"><b>วิธีอ่าน:</b> หน่วยนับหลักคือ “แปลง” ส่วนงวดใช้เป็นรายละเอียดเพื่อบอกว่าแปลงนั้นติดอยู่ตรงไหน สถานะ Overdue / Delayed / In progress เป็นสัญญาณจาก Excel ไม่ใช่ root cause หน้างาน</section>
+      </div>
+
+      <div id="trackingContent" class="view-content">
+        <section class="card table-card" id="trackingSection">
+          <div class="table-head"><div><h2>ติดตามรายแปลง</h2><p id="tableMeta"></p></div><button class="btn" id="exportCsv">Export CSV</button></div>
+          <div class="table-wrap"><table><thead><tr><th>แปลง</th><th>จังหวัด</th><th>ระดับติดตาม</th><th>Plan</th><th>Progress</th><th>Gap</th><th>ช้า</th><th>จุดติดขัดล่าสุด</th></tr></thead><tbody id="plotRows"></tbody></table></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden><article class="modal" role="dialog" aria-modal="true"><button class="modal-close" id="modalClose" aria-label="ปิด">×</button><div id="modalContent"></div></article></div>
+  <div class="modal-backdrop" id="qualityBackdrop" hidden><article class="modal quality-modal" role="dialog" aria-modal="true"><button class="modal-close" id="qualityClose" aria-label="ปิด">×</button><div id="qualityContent"></div></article></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="excel-parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
