@@ -1,1 +1,115 @@
-placeholder
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <title>BOQ Explorer | Forest Project Control</title>
+  <meta name="description" content="เว็บแอปสำรวจมูลค่า BOQ รายแปลง รายปี และรายงวด">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">FOREST PROJECT CONTROL / BOQ</div>
+      <h1>BOQ Contract Value Explorer</h1>
+      <p>มูลค่างานรายแปลง • ปี 1–10 • งวดงาน 1–4</p>
+    </div>
+    <nav class="topnav">
+      <a href="../">Project Dashboard</a>
+      <a href="../work-monitor/">Work Monitor</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="notice">
+      <strong>ข้อมูลนี้คือมูลค่า BOQ</strong>
+      <span>ไม่ใช่ยอดจ่ายจริงจาก ERP — ใช้เชื่อมกับ Progress/ERP ด้วย Plot ID และ Contract No.</span>
+    </section>
+
+    <section class="filters panel" aria-label="ตัวกรอง">
+      <div class="field grow">
+        <label for="search">ค้นหา</label>
+        <input id="search" type="search" placeholder="แปลง, สัญญา, จังหวัด, ตำบล, โครงการ...">
+      </div>
+      <div class="field">
+        <label for="year">ปีงาน</label>
+        <select id="year"></select>
+      </div>
+      <div class="field">
+        <label for="company">ผู้รับเหมา</label>
+        <select id="company"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="field">
+        <label for="province">จังหวัด</label>
+        <select id="province"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="field">
+        <label for="token">ประเภท</label>
+        <select id="token"><option value="">ทั้งหมด</option></select>
+      </div>
+      <button class="btn secondary" id="reset">ล้างตัวกรอง</button>
+    </section>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="grid-2">
+      <article class="panel chart-card">
+        <div class="section-head"><div><h2>BOQ รายปี</h2><p>มูลค่ารวมของแปลงที่ผ่านตัวกรอง</p></div></div>
+        <div id="yearChart" class="year-chart"></div>
+      </article>
+      <article class="panel chart-card">
+        <div class="section-head"><div><h2 id="installmentTitle">สัดส่วนงวด</h2><p>รวมมูลค่างวด 1–4 ของปีที่เลือก</p></div></div>
+        <div id="installmentChart"></div>
+      </article>
+    </section>
+
+    <section class="grid-2">
+      <article class="panel chart-card">
+        <div class="section-head"><div><h2>ผู้รับเหมา</h2><p>มูลค่า BOQ 10 ปีตามบริษัท</p></div></div>
+        <div id="companyChart"></div>
+      </article>
+      <article class="panel chart-card">
+        <div class="section-head"><div><h2>จังหวัดมูลค่าสูงสุด</h2><p>เรียงตาม BOQ 10 ปี</p></div></div>
+        <div id="provinceChart"></div>
+      </article>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="section-head table-head">
+        <div><h2>รายละเอียดรายแปลง</h2><p id="tableSubtitle"></p></div>
+        <div class="table-actions">
+          <label>เรียงตาม
+            <select id="sort">
+              <option value="total10y">มูลค่า 10 ปี</option>
+              <option value="yearValue">มูลค่าปีที่เลือก</option>
+              <option value="area">พื้นที่</option>
+              <option value="id">รหัสแปลง</option>
+            </select>
+          </label>
+          <button class="btn" id="exportCsv">Export CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>แปลง</th><th>ผู้รับเหมา</th><th>จังหวัด</th><th class="num">พื้นที่ (ไร่)</th><th>สัญญา</th><th class="num" id="yearCol">ปี 3</th><th class="num">รวม 10 ปี</th><th></th></tr></thead>
+          <tbody id="plotRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer><span id="sourceNote"></span><span>ค่าจริงของแต่ละงวดจาก workbook ถูกใช้เป็นหลัก รวมถึงแปลงที่ต่างจาก header template</span></footer>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="ปิด">×</button>
+      <div id="modalContent"></div>
+    </article>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
