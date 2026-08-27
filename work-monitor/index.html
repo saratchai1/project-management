@@ -7,6 +7,7 @@
   <title>Work Progress Monitor · ปี 2 / ปี 3</title>
   <meta name="description" content="Dashboard ติดตามความก้าวหน้างานรายแปลงและรายงวด ปี 2 และปี 3">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="dashboard-interactions.css">
 </head>
 <body>
   <header class="hero">
@@ -34,30 +35,42 @@
       <button class="btn ghost" id="reset">ล้างตัวกรอง</button>
     </section>
 
-    <section class="kpis" id="kpis"></section>
+    <nav class="view-nav card" aria-label="มุมมอง Dashboard">
+      <button class="view-btn active" data-view="overview">ภาพรวม</button>
+      <button class="view-btn" data-view="tracking">ติดตามงาน</button>
+    </nav>
 
-    <section class="main-grid">
-      <article class="card panel action-panel">
-        <div class="panel-head"><div><h2>รายการที่ควรเร่งก่อน</h2><p>เรียงจากระดับความเสี่ยง + มูลค่างานที่ยังตามแผนไม่ทัน</p></div><span class="live-pill">ACTION QUEUE</span></div>
-        <div id="actionQueue" class="action-list"></div>
-      </article>
-      <article class="card panel">
-        <div class="panel-head"><div><h2>สุขภาพงวดงาน</h2><p>สถานะงวดทั้งหมดของปีที่เลือก</p></div></div>
-        <div id="installmentHealth"></div>
-      </article>
-    </section>
+    <div id="overviewContent" class="view-content active">
+      <section class="kpis" id="kpis"></section>
 
-    <section class="card panel province-panel">
-      <div class="panel-head"><div><h2>จังหวัดที่ต้องจับตา</h2><p>ดูสัดส่วนแปลงที่ต้องเร่งในแต่ละจังหวัด · คลิกเพื่อกรอง</p></div></div>
-      <div id="provinceHealth" class="province-list"></div>
-    </section>
+      <section class="risk-grid">
+        <article class="card panel risk-panel">
+          <div class="panel-head"><div><h2>Risk Distribution</h2><p>สุขภาพงานรายแปลง · วางเมาส์ดูรายชื่อ · คลิกเพื่อกรองและไปติดตามงาน</p></div></div>
+          <div id="installmentHealth"></div>
+        </article>
+      </section>
 
-    <section class="card table-card" id="trackingSection">
-      <div class="table-head"><div><h2>ติดตามรายแปลง</h2><p id="tableMeta"></p></div><button class="btn" id="exportCsv">Export CSV</button></div>
-      <div class="table-wrap"><table><thead><tr><th>แปลง</th><th>จังหวัด</th><th>ระดับติดตาม</th><th>Plan</th><th>Progress</th><th>Gap</th><th>ช้า</th><th>จุดติดขัดล่าสุด</th><th>มูลค่างานตามแผนที่ยังขาด</th></tr></thead><tbody id="plotRows"></tbody></table></div>
-    </section>
+      <section class="main-grid action-grid">
+        <article class="card panel action-panel">
+          <div class="panel-head"><div><h2>รายการที่ควรเร่งก่อน</h2><p>เรียงจากระดับความเสี่ยง + Gap + จำนวนวันช้า</p></div><span class="live-pill">ACTION QUEUE</span></div>
+          <div id="actionQueue" class="action-list"></div>
+        </article>
+      </section>
 
-    <section class="note"><b>วิธีอ่าน:</b> “จุดติดขัด” ใน dashboard นี้หมายถึงสัญญาณจากสถานะงวดงาน เช่น Overdue / Delayed / In progress ไม่ใช่สาเหตุหน้างานจริง เพราะ tab ปี 2 / ปี 3 ไม่มี field ระบุ root cause.</section>
+      <section class="card panel province-panel">
+        <div class="panel-head"><div><h2>จังหวัดที่ต้องจับตา</h2><p>ดูสัดส่วนแปลงที่ต้องเร่งในแต่ละจังหวัด · คลิกเพื่อกรอง</p></div></div>
+        <div id="provinceHealth" class="province-list"></div>
+      </section>
+
+      <section class="note"><b>วิธีอ่าน:</b> “จุดติดขัด” ใน dashboard นี้หมายถึงสัญญาณจากสถานะงวดงาน เช่น Overdue / Delayed / In progress ไม่ใช่สาเหตุหน้างานจริง เพราะ tab ปี 2 / ปี 3 ไม่มี field ระบุ root cause.</section>
+    </div>
+
+    <div id="trackingContent" class="view-content">
+      <section class="card table-card" id="trackingSection">
+        <div class="table-head"><div><h2>ติดตามรายแปลง</h2><p id="tableMeta"></p></div><button class="btn" id="exportCsv">Export CSV</button></div>
+        <div class="table-wrap"><table><thead><tr><th>แปลง</th><th>จังหวัด</th><th>ระดับติดตาม</th><th>Plan</th><th>Progress</th><th>Gap</th><th>ช้า</th><th>จุดติดขัดล่าสุด</th></tr></thead><tbody id="plotRows"></tbody></table></div>
+      </section>
+    </div>
   </main>
 
   <div class="modal-backdrop" id="modalBackdrop" hidden><article class="modal" role="dialog" aria-modal="true"><button class="modal-close" id="modalClose" aria-label="ปิด">×</button><div id="modalContent"></div></article></div>
