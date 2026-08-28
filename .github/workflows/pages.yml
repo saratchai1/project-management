@@ -28,6 +28,11 @@ jobs:
         run: node work-monitor/validate.js
       - name: Validate project finance data
         run: node boq/validate.js
+      - name: Validate reusable upload apps
+        run: |
+          node --check work-monitor-upload/app.js
+          node --check work-monitor-upload/excel-parser.js
+          node --check work-monitor-multifile/app.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
