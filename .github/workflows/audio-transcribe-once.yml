@@ -8,6 +8,10 @@ on:
       - .github/workflows/audio-transcribe-once.yml
       - tmp-audio/trigger.txt
 
+concurrency:
+  group: temporary-audio-transcription
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -20,16 +24,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate one-time key and wait for encrypted audio
+      - name: Generate one-time encryption key
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/audio-key /tmp/audio-work
           openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/audio-key/private.pem >/dev/null 2>&1
           openssl pkey -in /tmp/audio-key/private.pem -pubout -out /tmp/audio-key/public.pem >/dev/null 2>&1
-          echo "AUDIO_PUBLIC_KEY_B64=$(base64 -w0 /tmp/audio-key/public.pem)"
-          echo "AUDIO_WAITING_FOR_PAYLOAD"
+          echo "AUDIO_KEY_READY"
 
+      - name: Upload one-time public key
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-one-time-public-key
+          path: /tmp/audio-key/public.pem
+          retention-days: 1
+
+      - name: Wait for encrypted audio and decrypt
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "AUDIO_WAITING_FOR_PAYLOAD"
           found=0
           for i in $(seq 1 240); do
             git fetch origin tmp-audio-transcribe-20260828 --quiet
