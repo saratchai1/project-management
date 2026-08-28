@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123f38">
+  <title>Contract Submission Monitor · Project Hub</title>
+  <meta name="description" content="เลือกโครงการ เพิ่มหรือลบ Excel และติดตามการส่งงานผู้รับเหมาช่วงจากคอลัมน์ ผรม. ส่งงานวันที่">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <div class="eyebrow">FOREST OPERATIONS · CONTRACT SUBMISSION CONTROL</div>
+      <h1>Contract Submission Monitor</h1>
+      <p>เลือกโครงการเอง · เพิ่ม/ลบ Excel ได้เอง · ระบบอ่านสถานะจาก <b>ผรม. ส่งงานวันที่</b></p>
+    </div>
+    <div class="snapshot" id="heroSummary">ยังไม่ได้เลือกโครงการ</div>
+  </header>
+
+  <main>
+    <section class="project-toolbar card">
+      <div class="toolbar-copy">
+        <span class="section-kicker">PROJECT FILTER</span>
+        <strong>เลือกพื้นที่ข้อมูลก่อนดู Dashboard</strong>
+        <small>แต่ละโครงการมีชุด Excel แยกจากกันในแท็บนี้</small>
+      </div>
+      <div class="toolbar-controls">
+        <label class="field compact-field">
+          <span>โครงการ</span>
+          <select id="projectSelect" disabled><option value="">ยังไม่มีโครงการ</option></select>
+        </label>
+        <button class="btn ghost" id="showProjectsBtn" type="button">รายการโครงการ</button>
+        <button class="btn" id="addProjectBtn" type="button">＋ เพิ่มโครงการ</button>
+      </div>
+    </section>
+
+    <section id="projectHub" class="project-hub">
+      <article class="hub-intro card">
+        <div>
+          <span class="section-kicker">STEP 1 · PROJECT</span>
+          <h2>สร้างหรือเลือกโครงการ</h2>
+          <p>ตั้งชื่อโครงการตามที่คุณต้องการ จากนั้นเพิ่ม Excel ปีที่ 1 / 2 / 3 หรือไฟล์อัปเดตรอบใหม่เข้าโครงการนั้น</p>
+        </div>
+        <div class="flow"><b>1</b> เลือกโครงการ <i>→</i> <b>2</b> เพิ่ม Excel <i>→</i> <b>3</b> Dashboard rebuild อัตโนมัติ</div>
+      </article>
+      <div id="projectCards" class="project-grid"></div>
+    </section>
+
+    <section id="workspace" hidden>
+      <section class="workspace-head card">
+        <div>
+          <div class="eyebrow">ACTIVE PROJECT</div>
+          <h2 id="activeProjectName"></h2>
+          <p id="activeProjectNote"></p>
+        </div>
+        <div class="workspace-actions">
+          <span class="workspace-status" id="workspaceStatus">ยังไม่มี Excel</span>
+          <button class="btn ghost" id="switchProjectBtn" type="button">เปลี่ยนโครงการ</button>
+          <button class="btn ghost" id="editProjectBtn" type="button">แก้ไขชื่อ</button>
+          <button class="btn danger-outline" id="deleteProjectBtn" type="button">ลบโครงการ</button>
+        </div>
+      </section>
+
+      <section class="file-manager card">
+        <div class="file-manager-head">
+          <div>
+            <span class="section-kicker">LOCAL EXCEL LIBRARY</span>
+            <h2>ไฟล์ Monitor ของโครงการนี้</h2>
+            <p id="fileSummary">ยังไม่มีไฟล์</p>
+          </div>
+          <div class="file-actions">
+            <button class="btn ghost" id="qualityBtn" type="button" disabled>Data Quality</button>
+            <button class="btn" id="addFilesBtn" type="button">＋ เพิ่ม Excel</button>
+          </div>
+        </div>
+        <label class="dropzone" id="dropzone" for="excelInput">
+          <input id="excelInput" type="file" accept=".xlsx,.xls,.xlsm,.xlsb" multiple hidden>
+          <span class="drop-icon">＋</span>
+          <strong>เลือก Excel หลายไฟล์ หรือลากมาวาง</strong>
+          <small>รองรับไฟล์ทะเบียนคุมที่มี section ROK-ผรม. และคอลัมน์ “ผรม. ส่งงานวันที่”</small>
+        </label>
+        <div id="fileList" class="file-list"></div>
+        <div class="privacy-note"><b>ไฟล์อ่านใน browser</b> — ไม่อัปโหลด raw Excel ขึ้น GitHub/server และจะหายจากโครงการเมื่อ Refresh/ปิดแท็บ</div>
+      </section>
+
+      <section id="emptyDashboard" class="empty-dashboard card">
+        <div class="empty-icon">XLS</div>
+        <h2>เพิ่ม Excel เพื่อเริ่มติดตามงาน</h2>
+        <p>เมื่ออ่านไฟล์สำเร็จ ระบบจะรวมปีโครงการ → ปีดำเนินงาน → แปลง → งวด และคำนวณสถานะใหม่จากข้อมูลดิบ</p>
+      </section>
+
+      <div id="dashboard" hidden>
+        <section class="filters card">
+          <label class="field search-field"><span>ค้นหาแปลง / สัญญา</span><input id="search" type="search" placeholder="เช่น 37-STC, ROK/CB/67-211"></label>
+          <label class="field"><span>ปีโครงการ</span><select id="projectYear"><option value="">ทั้งหมด</option></select></label>
+          <label class="field"><span>ปีดำเนินงาน</span><select id="workYear"><option value="">ทั้งหมด</option></select></label>
+          <label class="field"><span>จังหวัด</span><select id="province"><option value="">ทั้งหมด</option></select></label>
+          <label class="field"><span>งวด</span><select id="installment"><option value="">ทุกงวด</option></select></label>
+          <label class="field"><span>สถานะ</span><select id="status">
+            <option value="">ทั้งหมด</option>
+            <option value="submitted">ส่งแล้ว</option>
+            <option value="pending">ยังไม่ส่ง</option>
+            <option value="suspended">ชะลอ</option>
+            <option value="terminated">ยุติ</option>
+            <option value="na">N/A</option>
+          </select></label>
+          <button class="btn ghost reset-btn" id="resetFilters" type="button">ล้างตัวกรอง</button>
+        </section>
+
+        <section id="kpis" class="kpi-grid"></section>
+
+        <section class="dashboard-grid">
+          <article class="card panel installment-panel">
+            <div class="panel-head">
+              <div><h2>Submission by Installment</h2><p>ใช้วันที่จริงใน “ผรม. ส่งงานวันที่” เท่านั้นเป็น Submitted</p></div>
+            </div>
+            <div id="installmentSummary" class="installment-summary"></div>
+          </article>
+
+          <article class="card panel province-panel">
+            <div class="panel-head"><div><h2>จังหวัดที่ยังค้างส่ง</h2><p>เรียงจากจำนวนแปลงที่มีงวดค้างส่งมากที่สุด</p></div></div>
+            <div id="provinceSummary" class="province-summary"></div>
+          </article>
+        </section>
+
+        <section class="card table-card">
+          <div class="table-head">
+            <div><h2>ติดตามรายแปลง</h2><p id="tableMeta"></p></div>
+            <button class="btn ghost" id="exportCsv" type="button">Export CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>แปลง</th><th>จังหวัด</th><th>บริษัท</th><th>สัญญา TC–ROK</th><th>ปีโครงการ</th><th>ปีที่</th><th>งวด</th><th>สถานะ</th><th>วันที่/ข้อความ</th><th>แหล่งข้อมูล</th></tr></thead>
+              <tbody id="submissionRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="session-note"><b>การเก็บข้อมูล:</b> รายชื่อโครงการจำไว้ใน browser เครื่องนี้ แต่ Excel และข้อมูลที่ parse แล้วเก็บเฉพาะแท็บปัจจุบัน เพื่อไม่ส่งข้อมูลบริษัทขึ้น server</section>
+  </main>
+
+  <div class="modal-backdrop" id="projectModal" hidden>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+      <button class="modal-close" id="projectModalClose" type="button" aria-label="ปิด">×</button>
+      <div class="modal-head"><div class="eyebrow">PROJECT SETUP</div><h2 id="projectModalTitle">เพิ่มโครงการ</h2><p>ชื่อโครงการเป็นตัวแบ่งชุด Excel ใน browser</p></div>
+      <div class="modal-body">
+        <label class="field"><span>ชื่อโครงการ *</span><input id="projectNameInput" type="text" maxlength="160" placeholder="เช่น โครงการปลูกป่าคาร์บอนเครดิต ปี 2565"></label>
+        <label class="field"><span>รายละเอียด</span><textarea id="projectNoteInput" maxlength="500" placeholder="เช่น 160 แปลง · ติดตามปีที่ 1–3"></textarea></label>
+        <div class="form-error" id="projectFormError"></div>
+        <div class="modal-actions"><button class="btn ghost" id="projectCancel" type="button">ยกเลิก</button><button class="btn" id="projectSave" type="button">บันทึก</button></div>
+      </div>
+    </article>
+  </div>
+
+  <div class="modal-backdrop" id="detailModal" hidden>
+    <article class="modal wide-modal" role="dialog" aria-modal="true">
+      <button class="modal-close" id="detailClose" type="button" aria-label="ปิด">×</button>
+      <div id="detailContent"></div>
+    </article>
+  </div>
+
+  <div class="modal-backdrop" id="qualityModal" hidden>
+    <article class="modal wide-modal" role="dialog" aria-modal="true">
+      <button class="modal-close" id="qualityClose" type="button" aria-label="ปิด">×</button>
+      <div id="qualityContent"></div>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
