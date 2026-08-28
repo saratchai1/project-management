@@ -40,17 +40,17 @@ jobs:
           path: /tmp/audio-key/public.pem
           retention-days: 1
 
-      - name: Wait for encrypted audio and decrypt
+      - name: Wait for encrypted audio chunks and decrypt
         shell: bash
         run: |
           set -euo pipefail
-          echo "AUDIO_WAITING_FOR_PAYLOAD"
+          echo "AUDIO_WAITING_FOR_PAYLOAD_CHUNKS"
           found=0
           for i in $(seq 1 240); do
             git fetch origin tmp-audio-transcribe-20260828 --quiet
-            if git show origin/tmp-audio-transcribe-20260828:tmp-audio/payload.b64 > /tmp/audio-work/payload.b64 2>/dev/null; then
+            if git show origin/tmp-audio-transcribe-20260828:tmp-audio/parts/manifest.txt > /tmp/audio-work/manifest.txt 2>/dev/null; then
               found=1
-              echo "AUDIO_PAYLOAD_FOUND"
+              echo "AUDIO_MANIFEST_FOUND"
               break
             fi
             sleep 5
@@ -59,6 +59,18 @@ jobs:
             echo "AUDIO_PAYLOAD_TIMEOUT" >&2
             exit 1
           fi
+
+          PART_COUNT=$(tr -dc '0-9' < /tmp/audio-work/manifest.txt)
+          if [ -z "$PART_COUNT" ] || [ "$PART_COUNT" -lt 1 ] || [ "$PART_COUNT" -gt 100 ]; then
+            echo "INVALID_PART_COUNT" >&2
+            exit 1
+          fi
+          : > /tmp/audio-work/payload.b64
+          for n in $(seq 1 "$PART_COUNT"); do
+            part=$(printf 'tmp-audio/parts/part-%03d.txt' "$n")
+            git show "origin/tmp-audio-transcribe-20260828:$part" >> /tmp/audio-work/payload.b64
+          done
+          echo "AUDIO_PARTS_ASSEMBLED=$PART_COUNT"
 
           base64 -d /tmp/audio-work/payload.b64 > /tmp/audio-work/payload.tar.gz
           tar -xzf /tmp/audio-work/payload.tar.gz -C /tmp/audio-work
