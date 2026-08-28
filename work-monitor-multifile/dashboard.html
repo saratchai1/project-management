@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d332d">
+  <title>Work Progress Monitor · Project Dashboard</title>
+  <meta name="description" content="อัปโหลด Excel หลายไฟล์และรวม dashboard ติดตามความก้าวหน้างานรายแปลง">
+  <script>
+    (()=>{
+      const params=new URLSearchParams(location.search);
+      if(params.get('embedded')==='1')document.documentElement.classList.add('embedded');
+      const projectName=params.get('name');
+      if(projectName)document.title=`${projectName} · Work Progress Monitor`;
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    html.embedded .hero{display:none}
+    html.embedded main{max-width:none;padding:14px 16px 48px}
+    html.embedded body{min-height:100vh}
+    html.embedded .upload-card{margin-top:0}
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <div class="eyebrow">FIELD OPERATIONS CONTROL · MULTI-FILE</div>
+      <h1>Work Progress Monitor</h1>
+      <p>เพิ่มหรือลบ Excel หลายไฟล์ แล้วรวมข้อมูลปีงานเป็น dashboard เดียว</p>
+    </div>
+    <div class="snapshot" id="snapshot">ยังไม่มีไฟล์</div>
+  </header>
+
+  <main>
+    <section class="upload-card card" id="emptyUpload">
+      <div class="upload-copy">
+        <span class="upload-kicker">LOCAL EXCEL LIBRARY</span>
+        <h2>เพิ่มไฟล์ Monitor</h2>
+        <p>เลือกได้หลายไฟล์ เช่น ปี 1 แยกไฟล์กับปี 2 แยกไฟล์ และลบออกภายหลังได้</p>
+      </div>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.xlsb" multiple hidden>
+        <span class="upload-icon">＋</span>
+        <strong>เลือก Excel หลายไฟล์ หรือลากมาวาง</strong>
+        <small>.xlsx / .xls / .xlsm / .xlsb</small>
+      </label>
+      <div class="privacy-note"><b>ไฟล์อยู่บนเครื่องผู้ใช้</b> — browser อ่านข้อมูล locally และไม่ส่ง Excel ขึ้น GitHub/server</div>
+    </section>
+
+    <section class="error-card card" id="errorCard" hidden></section>
+
+    <div id="workspace" hidden>
+      <section class="file-manager card">
+        <div class="file-manager-head">
+          <div>
+            <span class="file-label">ไฟล์ที่ใช้งานอยู่</span>
+            <strong id="fileSummary"></strong>
+            <small>เพิ่ม/ลบไฟล์ได้ตลอด Dashboard จะ rebuild อัตโนมัติ</small>
+          </div>
+          <div class="file-actions">
+            <button class="btn ghost" id="qualityBtn">Data Quality</button>
+            <button class="btn" id="addFilesBtn">＋ เพิ่มไฟล์</button>
+          </div>
+        </div>
+        <div id="fileList" class="file-list"></div>
+      </section>
+
+      <nav class="year-nav card" id="yearNav" aria-label="เลือกปีงาน"></nav>
+
+      <section class="filters card">
+        <div class="field search-field"><label for="search">ค้นหาแปลง</label><input id="search" type="search" placeholder="เช่น 37-STC, กระบี่..."></div>
+        <div class="field"><label for="province">จังหวัด</label><select id="province"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label for="risk">ระดับติดตาม</label><select id="risk">
+          <option value="">ทั้งหมด</option>
+          <option value="critical">วิกฤต · เร่งทันที</option>
+          <option value="high">เสี่ยงสูง · ต้องเร่ง</option>
+          <option value="watch">เฝ้าระวัง</option>
+          <option value="on_track">ตามแผน</option>
+          <option value="future">ยังไม่ถึงแผน</option>
+          <option value="completed">ปิดงานแล้ว</option>
+        </select></div>
+        <label class="urgent-toggle"><input id="urgentOnly" type="checkbox"> <span>เฉพาะที่ต้องเร่ง</span></label>
+        <button class="btn ghost" id="reset">ล้างตัวกรอง</button>
+      </section>
+
+      <nav class="view-nav card" aria-label="มุมมอง Dashboard">
+        <button class="view-btn active" data-view="overview">ภาพรวม</button>
+        <button class="view-btn" data-view="tracking">ติดตามงาน</button>
+      </nav>
+
+      <div id="overviewContent" class="view-content active">
+        <section class="kpis" id="kpis"></section>
+
+        <section class="card panel risk-panel">
+          <div class="panel-head"><div><h2>Risk Distribution</h2><p>นับเป็น “แปลง” · วางเมาส์ดูรายชื่อ · คลิกเพื่อกรองและไปติดตามงาน</p></div></div>
+          <div id="riskChart"></div>
+        </section>
+
+        <section class="card panel action-panel">
+          <div class="panel-head"><div><h2>รายการที่ควรเร่งก่อน</h2><p>เรียงจากระดับความเสี่ยง + Gap + จำนวนวันช้า</p></div><span class="live-pill">ACTION QUEUE</span></div>
+          <div id="actionQueue" class="action-list"></div>
+        </section>
+
+        <section class="card panel province-panel">
+          <div class="panel-head"><div><h2>จังหวัดที่ต้องจับตา</h2><p>ดูสัดส่วนแปลงที่ต้องเร่งในแต่ละจังหวัด · คลิกเพื่อกรอง</p></div></div>
+          <div id="provinceHealth" class="province-list"></div>
+        </section>
+
+        <section class="note"><b>วิธีอ่าน:</b> หน่วยนับหลักคือ “แปลง” ส่วนงวดใช้เป็นรายละเอียดเพื่อบอกว่าแปลงนั้นติดอยู่ตรงไหน หากไฟล์หลายตัวมีปี/Plot ID เดียวกัน ระบบใช้ข้อมูลจากไฟล์ที่เพิ่มล่าสุดและแจ้งใน Data Quality</section>
+      </div>
+
+      <div id="trackingContent" class="view-content">
+        <section class="card table-card" id="trackingSection">
+          <div class="table-head"><div><h2>ติดตามรายแปลง</h2><p id="tableMeta"></p></div><button class="btn" id="exportCsv">Export CSV</button></div>
+          <div class="table-wrap"><table><thead><tr><th>แปลง</th><th>จังหวัด</th><th>ระดับติดตาม</th><th>Plan</th><th>Progress</th><th>Gap</th><th>ช้า</th><th>จุดติดขัดล่าสุด</th><th>แหล่งข้อมูล</th></tr></thead><tbody id="plotRows"></tbody></table></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden><article class="modal" role="dialog" aria-modal="true"><button class="modal-close" id="modalClose" aria-label="ปิด">×</button><div id="modalContent"></div></article></div>
+  <div class="modal-backdrop" id="qualityBackdrop" hidden><article class="modal quality-modal" role="dialog" aria-modal="true"><button class="modal-close" id="qualityClose" aria-label="ปิด">×</button><div id="qualityContent"></div></article></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="../work-monitor-upload/excel-parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
