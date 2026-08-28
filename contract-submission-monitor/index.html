@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123b32">
+  <title>Contract Submission Monitor</title>
+  <meta name="description" content="Dashboard ติดตามการส่งงานผู้รับเหมาช่วงจากคอลัมน์ ผรม. ส่งงานวันที่">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow">FOREST PROJECT · CONTRACT DELIVERY CONTROL</div>
+      <h1>Contract Submission Monitor</h1>
+      <p>ติดตามการส่งงานรายแปลง/รายงวด โดยใช้กติกา <strong>“ผรม. ส่งงานวันที่ เป็นวันที่จริง = ส่งงานแล้ว”</strong></p>
+    </div>
+    <div class="snapshot">
+      <span>DATA SNAPSHOT</span>
+      <strong id="snapshotDate">—</strong>
+      <small>3 Excel sources</small>
+    </div>
+  </header>
+
+  <main>
+    <section class="contract-ladder card" aria-label="Contract hierarchy">
+      <div class="ladder-title">
+        <span class="section-kicker">CONTRACT HIERARCHY</span>
+        <h2>ระดับสัญญาที่ใช้ตีความข้อมูล</h2>
+      </div>
+      <div class="ladder">
+        <div class="party owner"><span>OWNER</span><strong>TC</strong><small>เจ้าของโครงการ</small></div>
+        <div class="arrow">→</div>
+        <div class="party main"><span>MAIN CONTRACTOR</span><strong>ROK</strong><small>ผู้รับเหมาหลัก</small></div>
+        <div class="arrow">→</div>
+        <div class="party sub"><span>SUBCONTRACTOR</span><strong>ผรม.</strong><small>ชื่อรายบริษัทไม่อยู่ใน 3 source files</small></div>
+      </div>
+      <div class="rule-strip"><b>Monitoring layer:</b> ROK–ผรม. <span></span> <b>Rule:</b> มีวันที่ใน <code>ผรม. ส่งงานวันที่</code> = ส่งงวดนั้นแล้ว</div>
+    </section>
+
+    <nav class="dataset-tabs card" id="datasetTabs" aria-label="เลือกชุดข้อมูล"></nav>
+
+    <section class="filters card">
+      <div class="field search"><label for="search">ค้นหาแปลง / จังหวัด / เลขสัญญา</label><input id="search" type="search" placeholder="เช่น 37-STC, กระบี่, ROK/CB/67-..." autocomplete="off"></div>
+      <div class="field"><label for="province">จังหวัด</label><select id="province"><option value="">ทั้งหมด</option></select></div>
+      <div class="field"><label for="company">กลุ่มบริษัทในต้นทาง</label><select id="company"><option value="">ทั้งหมด</option></select></div>
+      <div class="field"><label for="overall">สถานะระดับแปลง</label><select id="overall">
+        <option value="">ทั้งหมด</option>
+        <option value="pending">มีงวดที่ยังไม่ส่ง</option>
+        <option value="complete">ส่งครบตามงวดที่คาดหวัง</option>
+        <option value="stopped">ชะลอ / ยุติ</option>
+        <option value="future_warning">มีวันที่อนาคต</option>
+      </select></div>
+      <div class="field"><label for="installment">เลือกงวด</label><select id="installment"><option value="">ทุกงวด</option></select></div>
+      <div class="field"><label for="instStatus">สถานะงวด</label><select id="instStatus">
+        <option value="">ทุกสถานะ</option>
+        <option value="pending">ยังไม่ส่ง</option>
+        <option value="submitted">ส่งแล้ว</option>
+        <option value="stopped">ชะลอ / ยุติ</option>
+        <option value="future">วันที่อนาคต</option>
+      </select></div>
+      <div class="filter-actions">
+        <button class="btn ghost" id="resetBtn">ล้างตัวกรอง</button>
+        <button class="btn ghost" id="qualityBtn">Data Quality</button>
+      </div>
+    </section>
+
+    <section class="kpi-grid" id="kpiGrid"></section>
+
+    <section class="card installment-panel">
+      <div class="panel-head">
+        <div><span class="section-kicker">INSTALLMENT STATUS</span><h2>สถานะการส่งงานรายงวด</h2><p id="installmentMeta"></p></div>
+        <div class="legend"><span><i class="dot submitted"></i>ส่งแล้ว</span><span><i class="dot pending"></i>ยังไม่ส่ง</span><span><i class="dot stopped"></i>ชะลอ/ยุติ</span><span><i class="dot na"></i>N/A</span></div>
+      </div>
+      <div class="installment-grid" id="installmentGrid"></div>
+    </section>
+
+    <section class="card table-card">
+      <div class="table-head">
+        <div><span class="section-kicker">PLOT MONITOR</span><h2>ติดตามรายแปลง</h2><p id="tableMeta"></p></div>
+        <button class="btn" id="exportBtn">Export CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr id="tableHeadRow"></tr></thead>
+          <tbody id="plotRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="source-note">
+      <b>หมายเหตุ:</b> Dashboard นี้คำนวณจาก raw row ใน Excel และไม่ใช้ตัวเลข summary ด้านบนชีตเป็นตัวตัดสินสถานะส่งงาน
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="detailBackdrop" hidden>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <button class="modal-close" id="detailClose" aria-label="ปิด">×</button>
+      <div id="detailContent"></div>
+    </article>
+  </div>
+
+  <div class="modal-backdrop" id="qualityBackdrop" hidden>
+    <article class="modal quality-modal" role="dialog" aria-modal="true" aria-labelledby="qualityTitle">
+      <button class="modal-close" id="qualityClose" aria-label="ปิด">×</button>
+      <div id="qualityContent"></div>
+    </article>
+  </div>
+
+  <script src="data-meta.js"></script>
+  <script src="data-2566-y1-1.js"></script>
+  <script src="data-2565-y2-1.js"></script>
+  <script src="data-2565-y2-2.js"></script>
+  <script src="data-2565-y2-3.js"></script>
+  <script src="data-2565-y3-1.js"></script>
+  <script src="data-2565-y3-2.js"></script>
+  <script src="data-2565-y3-3.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
