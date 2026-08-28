@@ -1,0 +1,121 @@
+name: Temporary one-time audio transcription
+
+on:
+  push:
+    branches:
+      - tmp-audio-transcribe-20260828
+    paths:
+      - .github/workflows/audio-transcribe-once.yml
+      - tmp-audio/trigger.txt
+
+permissions:
+  contents: read
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate one-time key and wait for encrypted audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/audio-key /tmp/audio-work
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/audio-key/private.pem >/dev/null 2>&1
+          openssl pkey -in /tmp/audio-key/private.pem -pubout -out /tmp/audio-key/public.pem >/dev/null 2>&1
+          echo "AUDIO_PUBLIC_KEY_B64=$(base64 -w0 /tmp/audio-key/public.pem)"
+          echo "AUDIO_WAITING_FOR_PAYLOAD"
+
+          found=0
+          for i in $(seq 1 240); do
+            git fetch origin tmp-audio-transcribe-20260828 --quiet
+            if git show origin/tmp-audio-transcribe-20260828:tmp-audio/payload.b64 > /tmp/audio-work/payload.b64 2>/dev/null; then
+              found=1
+              echo "AUDIO_PAYLOAD_FOUND"
+              break
+            fi
+            sleep 5
+          done
+          if [ "$found" -ne 1 ]; then
+            echo "AUDIO_PAYLOAD_TIMEOUT" >&2
+            exit 1
+          fi
+
+          base64 -d /tmp/audio-work/payload.b64 > /tmp/audio-work/payload.tar.gz
+          tar -xzf /tmp/audio-work/payload.tar.gz -C /tmp/audio-work
+          openssl pkeyutl -decrypt \
+            -inkey /tmp/audio-key/private.pem \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -in /tmp/audio-work/key.enc \
+            -out /tmp/audio-work/key.txt
+          IFS=: read -r AUDIO_KEY AUDIO_IV < /tmp/audio-work/key.txt
+          openssl enc -d -aes-256-cbc \
+            -K "$AUDIO_KEY" \
+            -iv "$AUDIO_IV" \
+            -in /tmp/audio-work/audio.enc \
+            -out /tmp/audio-work/audio.ogg
+          ffmpeg -y -hide_banner -loglevel error \
+            -i /tmp/audio-work/audio.ogg \
+            -ar 16000 -ac 1 -c:a pcm_s16le \
+            /tmp/audio-work/audio.wav
+          echo "AUDIO_DECRYPTED"
+
+      - name: Install transcription runtime
+        run: python -m pip install --quiet faster-whisper
+
+      - name: Transcribe Thai audio
+        shell: bash
+        run: |
+          cat > /tmp/audio-work/transcribe.py <<'PY'
+          from faster_whisper import WhisperModel
+          from pathlib import Path
+
+          model_name = "Thaweewat/whisper-th-small-ct2"
+          try:
+              model = WhisperModel(model_name, device="cpu", compute_type="int8")
+          except Exception as exc:
+              print(f"THAI_MODEL_LOAD_FAILED: {exc}")
+              model_name = "small"
+              model = WhisperModel(model_name, device="cpu", compute_type="int8")
+
+          segments, info = model.transcribe(
+              "/tmp/audio-work/audio.wav",
+              language="th",
+              beam_size=5,
+              best_of=5,
+              vad_filter=True,
+              condition_on_previous_text=True,
+              temperature=0.0,
+          )
+          items = []
+          for segment in segments:
+              text = segment.text.strip()
+              if text:
+                  items.append((segment.start, segment.end, text))
+
+          transcript = " ".join(text for _, _, text in items).strip()
+          lines = [
+              f"MODEL={model_name}",
+              f"LANGUAGE={info.language}",
+              f"LANGUAGE_PROBABILITY={info.language_probability}",
+              "TRANSCRIPT_BEGIN",
+          ]
+          lines.extend(f"[{start:0.2f}-{end:0.2f}] {text}" for start, end, text in items)
+          lines.extend(["TRANSCRIPT_TEXT", transcript, "TRANSCRIPT_END"])
+          output = "\n".join(lines) + "\n"
+          Path("/tmp/audio-work/transcript.txt").write_text(output, encoding="utf-8")
+          print(output)
+          PY
+          python /tmp/audio-work/transcribe.py
+
+      - name: Upload transcript
+        uses: actions/upload-artifact@v4
+        with:
+          name: thai-audio-transcript
+          path: /tmp/audio-work/transcript.txt
+          retention-days: 1
