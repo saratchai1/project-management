@@ -36,7 +36,7 @@ jobs:
       - name: Upload one-time public key
         uses: actions/upload-artifact@v4
         with:
-          name: audio-one-time-public-key
+          name: audio-one-time-public-key-run4
           path: /tmp/audio-key/public.pem
           retention-days: 1
 
@@ -44,11 +44,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          BASE='tmp-audio/run4/parts'
           echo "AUDIO_WAITING_FOR_PAYLOAD_CHUNKS"
           found=0
           for i in $(seq 1 240); do
             git fetch origin tmp-audio-transcribe-20260828 --quiet
-            if git show origin/tmp-audio-transcribe-20260828:tmp-audio/parts/manifest.txt > /tmp/audio-work/manifest.txt 2>/dev/null; then
+            if git show "origin/tmp-audio-transcribe-20260828:${BASE}/manifest.txt" > /tmp/audio-work/manifest.txt 2>/dev/null; then
               found=1
               echo "AUDIO_MANIFEST_FOUND"
               break
@@ -60,17 +61,24 @@ jobs:
             exit 1
           fi
 
-          PART_COUNT=$(tr -dc '0-9' < /tmp/audio-work/manifest.txt)
+          PART_COUNT=$(sed -n '1p' /tmp/audio-work/manifest.txt | tr -dc '0-9')
+          EXPECTED_SHA=$(sed -n '2p' /tmp/audio-work/manifest.txt | tr -d '[:space:]')
           if [ -z "$PART_COUNT" ] || [ "$PART_COUNT" -lt 1 ] || [ "$PART_COUNT" -gt 100 ]; then
             echo "INVALID_PART_COUNT" >&2
             exit 1
           fi
           : > /tmp/audio-work/payload.b64
           for n in $(seq 1 "$PART_COUNT"); do
-            part=$(printf 'tmp-audio/parts/part-%03d.txt' "$n")
+            part=$(printf '%s/part-%03d.txt' "$BASE" "$n")
             git show "origin/tmp-audio-transcribe-20260828:$part" >> /tmp/audio-work/payload.b64
           done
+          ACTUAL_SHA=$(sha256sum /tmp/audio-work/payload.b64 | awk '{print $1}')
           echo "AUDIO_PARTS_ASSEMBLED=$PART_COUNT"
+          echo "AUDIO_PAYLOAD_SHA=$ACTUAL_SHA"
+          if [ -n "$EXPECTED_SHA" ] && [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "AUDIO_PAYLOAD_SHA_MISMATCH expected=$EXPECTED_SHA actual=$ACTUAL_SHA" >&2
+            exit 1
+          fi
 
           base64 -d /tmp/audio-work/payload.b64 > /tmp/audio-work/payload.tar.gz
           tar -xzf /tmp/audio-work/payload.tar.gz -C /tmp/audio-work
@@ -143,6 +151,6 @@ jobs:
       - name: Upload transcript
         uses: actions/upload-artifact@v4
         with:
-          name: thai-audio-transcript
+          name: thai-audio-transcript-run4
           path: /tmp/audio-work/transcript.txt
           retention-days: 1
