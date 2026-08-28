@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123c34">
+  <title>ROK Subcontractor Contract Control</title>
+  <meta name="description" content="Dashboard แยกสำหรับติดตามสัญญาและโครงสร้างค่าใช้จ่ายปีที่ 3 ระหว่าง STC/VSD, ROK และผู้รับเหมาช่วง">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <div class="eyebrow">STC / VSD → ROK → SUBCONTRACTOR</div>
+        <h1>ROK Subcontractor Contract Control</h1>
+        <p>ติดตามสัญญาปีที่ 3 มูลค่า โครงสร้างงวด และสายผู้รับผิดชอบ โดยแยกจาก Dashboard เดิม</p>
+      </div>
+      <div class="hero-meta" id="heroMeta"></div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <nav class="tabs" aria-label="มุมมอง Dashboard">
+      <button class="tab active" data-view="overview">ภาพรวม</button>
+      <button class="tab" data-view="chain">สายสัญญา</button>
+      <button class="tab" data-view="cash">โครงสร้างงวด</button>
+      <button class="tab" data-view="register">ทะเบียนสัญญา</button>
+      <button class="tab" data-view="exceptions">ข้อยกเว้น</button>
+    </nav>
+
+    <section class="filter-panel" aria-label="ตัวกรอง">
+      <div class="field search-field">
+        <label for="search">ค้นหา</label>
+        <input id="search" type="search" placeholder="แปลง, สัญญา, ผู้รับเหมา, PR, WO, ผู้รับผิดชอบ">
+      </div>
+      <div class="field">
+        <label for="owner">สายโครงการ</label>
+        <select id="owner"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="field">
+        <label for="status">สถานะ</label>
+        <select id="status">
+          <option value="current">สัญญาปัจจุบันทั้งหมด</option>
+          <option value="active">สัญญาปัจจุบันปกติ</option>
+          <option value="replacement">สัญญาทดแทน</option>
+          <option value="paused">ชะลอการดำเนินงาน</option>
+          <option value="cancelled">ยกเลิกแล้ว</option>
+          <option value="all">ทุกสถานะ</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="province">จังหวัด</label>
+        <select id="province"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="field wide-select">
+        <label for="subcontractor">ผู้รับเหมาช่วง</label>
+        <select id="subcontractor"><option value="">ทั้งหมด</option></select>
+      </div>
+      <div class="field wide-select">
+        <label for="coordinator">ผู้รับผิดชอบสัญญา</label>
+        <select id="coordinator"><option value="">ทั้งหมด</option></select>
+      </div>
+      <button class="btn secondary" id="resetFilters">ล้างตัวกรอง</button>
+    </section>
+
+    <div class="filter-summary" id="filterSummary"></div>
+    <section id="viewHost" aria-live="polite"></section>
+
+    <footer class="footer">
+      <span id="sourceNote"></span>
+      <span>ยอดในหน้า “โครงสร้างงวด” เป็นวงเงินตามสัญญา ไม่ใช่ยอดจ่ายจริงหรือ bank clearing</span>
+    </footer>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="ปิด">×</button>
+      <div id="modalContent"></div>
+    </article>
+  </div>
+
+  <noscript>Dashboard นี้ต้องเปิดใช้งาน JavaScript</noscript>
+  <script src="payload-01.js"></script>
+  <script src="payload-02.js"></script>
+  <script src="payload-03.js"></script>
+  <script src="payload-04.js"></script>
+  <script src="payload-05.js"></script>
+  <script src="payload-06.js"></script>
+  <script src="payload-07.js"></script>
+  <script src="loader.js"></script>
+</body>
+</html>
