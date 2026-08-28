@@ -1,45 +1,32 @@
-# Work Progress Monitor — Project Hub + Multi-file Excel
+# Work Progress Monitor — Project Hub / Multi-file
 
-Web app สำหรับแยกการติดตามงานตาม **โครงการ** ก่อนอัปโหลด Excel เช่น โครงการปลูกป่าชายเลนปี 65, โครงการปี 66 หรือโครงการป่าชุมชน
+เวอร์ชัน `work-monitor-multifile/` แยกข้อมูลตาม **โครงการ** ก่อนเข้าสู่ Progress Dashboard
 
-## ลำดับการใช้งาน
+## Workflow
 
 1. สร้างหรือเลือกโครงการ
-2. เข้า workspace ของโครงการนั้น
-3. เพิ่ม Excel ได้หลายไฟล์ เช่น ปี 1 แยกไฟล์กับปี 2
-4. ดู dashboard, เพิ่ม/ลบไฟล์ หรือสลับกลับไปโครงการอื่น
+2. ระบบเปิด Pop-up รายละเอียดโครงการ
+3. เพิ่ม Excel Progress และ/หรือแนบเอกสารของโครงการ
+4. เปิด Dashboard และเลือกปีงานเพื่อดู Plan / Progress / Risk รายแปลง
 
-## การแยกข้อมูล
+## ความสามารถ
 
-- แต่ละโครงการมี dashboard และ File Manager ของตัวเอง
-- Excel ของโครงการหนึ่งไม่ถูกรวมกับอีกโครงการ
-- สลับโครงการแล้วไฟล์ที่เลือกไว้ยังอยู่ ตราบใดที่ยังไม่ Refresh หรือปิดแท็บ
-- ลบโครงการจะนำ workspace และไฟล์ที่เลือกไว้ของโครงการนั้นออกจากหน้าเว็บ
-- รายชื่อและรายละเอียดโครงการถูกบันทึกใน `localStorage` ของ browser
-- เนื่องจากข้อจำกัดด้านความเป็นส่วนตัว ตัว Excel ไม่ถูกเก็บถาวร หลัง Refresh ต้องเลือก Excel ใหม่
+- Project filter ก่อนดู Progress
+- รายการโครงการและตัวเลือกสลับโครงการ
+- Pop-up รายละเอียดโครงการ แสดงจำนวนไฟล์ ปีงาน แปลง และเอกสารแนบ
+- Dashboard มาตรฐานเดียวกันทุกโครงการ แต่แยกข้อมูลออกจากกันด้วย iframe ต่อโครงการ
+- รองรับ Excel หลายไฟล์ต่อโครงการ เช่น ปีที่ 1 และปีที่ 2 แยกกัน
+- เพิ่ม/ลบ Excel ภายใน Dashboard ของโครงการนั้น
+- แนบเอกสารทั่วไปต่อโครงการ พร้อมเปิด/ดาวน์โหลดและลบ
+- Year tabs, Risk Distribution, Action Queue, จังหวัดที่ต้องจับตา และตารางติดตามรายแปลง
 
-## ความสามารถภายในแต่ละโครงการ
+## Data privacy / persistence
 
-- เพิ่ม Excel ได้หลายไฟล์พร้อมกัน หรือเพิ่มทีหลัง
-- ลบไฟล์ใดไฟล์หนึ่งและ rebuild dashboard อัตโนมัติ
-- ปุ่มปีงานสร้างจากทุกไฟล์ในโครงการนั้น
-- ถ้าปีเดียวกันมี Plot ID ซ้ำข้ามไฟล์ ใช้ข้อมูลจากไฟล์ที่เพิ่มล่าสุดและแจ้งใน Data Quality
-- Risk Distribution, Action Queue, จังหวัดที่ต้องจับตา และตารางติดตามรายแปลง
-- หน่วยนับหลักคือ **แปลง**; งวดใช้เป็นรายละเอียด drill-down
-- ไม่แสดงจำนวนเงิน
-- Excel ประมวลผลใน browser และไม่ถูกส่งขึ้น GitHub/server
-
-## โครงสร้าง
-
-- `index.html` — Project Hub สำหรับสร้าง/เลือก/แก้ไข/ลบโครงการ
-- `project-shell.js` / `project-shell.css` — จัดการ project workspace
-- `dashboard.html` — dashboard แบบ Multi-file ที่เปิดแยกหนึ่ง instance ต่อหนึ่งโครงการ
-- `app.js` — logic dashboard ภายในโครงการ
+- ชื่อและคำอธิบายโครงการถูกบันทึกใน `localStorage` ของ browser
+- Excel และเอกสารแนบอ่านจากเครื่องผู้ใช้และอยู่ในหน่วยความจำของแท็บปัจจุบันเท่านั้น
+- ไฟล์ไม่ถูกส่งขึ้น GitHub หรือ server
+- เมื่อ Refresh หรือปิดแท็บ ต้องเลือก Excel และเอกสารใหม่
 
 ## URL
 
 `https://saratchai1.github.io/project-management/work-monitor-multifile/`
-
-## Dependency
-
-ใช้ SheetJS `xlsx@0.18.5` จาก jsDelivr และใช้ parser ร่วมกับ `work-monitor-upload/excel-parser.js`
