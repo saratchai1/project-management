@@ -1,0 +1,49 @@
+name: Build temporary Whisper transcription tool
+
+on:
+  push:
+    paths:
+      - .github/workflows/build-whisper-tool.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WHISPER_MODEL_URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout whisper.cpp
+        run: git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git /tmp/whisper.cpp
+
+      - name: Build CPU CLI
+        run: |
+          cmake -S /tmp/whisper.cpp -B /tmp/whisper.cpp/build \
+            -DWHISPER_BUILD_TESTS=OFF \
+            -DWHISPER_BUILD_EXAMPLES=ON \
+            -DGGML_NATIVE=OFF
+          cmake --build /tmp/whisper.cpp/build --config Release -j 2
+
+      - name: Download multilingual model
+        run: |
+          mkdir -p /tmp/whisper-tool
+          curl -L --fail --retry 4 --retry-delay 5 \
+            "$WHISPER_MODEL_URL" \
+            -o /tmp/whisper-tool/ggml-small-q5_1.bin
+          CLI=$(find /tmp/whisper.cpp/build -type f -name whisper-cli -perm -111 | head -1)
+          test -n "$CLI"
+          cp "$CLI" /tmp/whisper-tool/whisper-cli
+          chmod +x /tmp/whisper-tool/whisper-cli
+          sha256sum /tmp/whisper-tool/*
+
+      - name: Upload tool artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-tool-linux-x64
+          path: /tmp/whisper-tool
+          compression-level: 0
+          retention-days: 1
