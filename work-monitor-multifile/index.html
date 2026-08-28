@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d332d">
   <title>Work Progress Monitor · Project Hub</title>
-  <meta name="description" content="เลือกโครงการก่อนอัปโหลด Excel และแยก dashboard ของแต่ละโครงการออกจากกัน">
+  <meta name="description" content="เลือกโครงการก่อนอัปโหลด Excel และแยก dashboard กับเอกสารของแต่ละโครงการออกจากกัน">
   <link rel="stylesheet" href="project-shell.css">
 </head>
 <body>
@@ -13,21 +13,21 @@
     <div>
       <div class="eyebrow">FIELD OPERATIONS CONTROL · PROJECT HUB</div>
       <h1>Work Progress Monitor</h1>
-      <p>เลือกโครงการก่อน แล้วจึงเพิ่ม Excel ของโครงการนั้น</p>
+      <p>เลือกโครงการก่อน แล้วจึงดูความคืบหน้ารายปีและจัดการไฟล์ของโครงการนั้น</p>
     </div>
-    <div class="snapshot" id="activeProjectSummary">เลือกโครงการก่อนอัปโหลด Excel</div>
+    <div class="snapshot" id="activeProjectSummary">เลือกโครงการก่อนดู Progress</div>
   </header>
 
   <main class="project-shell">
     <section class="project-toolbar card" id="projectToolbar">
       <div class="project-toolbar-copy">
-        <span class="file-label">PROJECT WORKSPACE</span>
-        <strong>แยกไฟล์และ Dashboard ตามโครงการ</strong>
-        <small>การสลับโครงการจะไม่ปนข้อมูล Excel ระหว่างกัน</small>
+        <span class="file-label">PROJECT FILTER</span>
+        <strong>เลือกโครงการก่อนดูความคืบหน้า</strong>
+        <small>ข้อมูล Excel และเอกสารของแต่ละโครงการถูกแยกออกจากกัน</small>
       </div>
       <div class="project-toolbar-controls">
         <div class="project-select-field">
-          <label for="projectSelect">เลือกโครงการ</label>
+          <label for="projectSelect">โครงการ</label>
           <select id="projectSelect" disabled><option value="">ยังไม่มีโครงการ</option></select>
         </div>
         <button class="btn ghost" id="showProjectsBtn" type="button">รายการโครงการ</button>
@@ -38,11 +38,11 @@
     <section class="project-hub" id="projectHub">
       <article class="hub-intro card">
         <div>
-          <span class="upload-kicker">STEP 1 · CHOOSE PROJECT</span>
-          <h2>เลือกโครงการก่อนอัปโหลด Excel</h2>
-          <p>ตัวอย่างเช่น โครงการปลูกป่าชายเลน ปี 65, โครงการปี 66 หรือโครงการป่าชุมชน แต่ละโครงการมีพื้นที่ไฟล์ ปีงาน และ dashboard ของตัวเอง</p>
+          <span class="upload-kicker">STEP 1 · SELECT PROJECT</span>
+          <h2>เลือกโครงการก่อนเริ่มติดตามงาน</h2>
+          <p>แต่ละโครงการใช้ Dashboard มาตรฐานเดียวกัน แต่แยกไฟล์ Excel ปีงาน รายชื่อแปลง และเอกสารแนบออกจากกันอย่างชัดเจน</p>
         </div>
-        <div class="hub-step"><span>1</span> เลือกโครงการ&nbsp; → &nbsp;<span>2</span> เพิ่ม Excel&nbsp; → &nbsp;<span>3</span> ติดตามงาน</div>
+        <div class="hub-step"><span>1</span> เลือกโครงการ&nbsp; → &nbsp;<span>2</span> ตรวจรายละเอียด / แนบไฟล์&nbsp; → &nbsp;<span>3</span> เปิด Dashboard</div>
       </article>
       <div class="project-grid" id="projectCards"></div>
     </section>
@@ -57,6 +57,7 @@
         <div class="workspace-meta">
           <span class="workspace-status" id="workspaceStatus">ยังไม่มีไฟล์</span>
           <div class="workspace-actions">
+            <button class="btn ghost" id="projectInfoBtn" type="button">รายละเอียดโครงการ</button>
             <button class="btn ghost" id="switchProjectBtn" type="button">เปลี่ยนโครงการ</button>
             <button class="btn ghost" id="renameProjectBtn" type="button">แก้ไขชื่อ</button>
             <button class="btn ghost" id="workspaceAddProjectBtn" type="button">＋ เพิ่มโครงการ</button>
@@ -68,9 +69,16 @@
     </section>
 
     <section class="session-note">
-      <b>การเก็บข้อมูล:</b> รายชื่อโครงการถูกจำไว้ใน browser เครื่องนี้ แต่ Excel ที่เลือกจะอยู่ในหน่วยความจำของแท็บปัจจุบันเท่านั้น เมื่อ Refresh หรือปิดแท็บ ต้องเลือก Excel ใหม่ โดยไฟล์ไม่ถูกส่งขึ้น GitHub/server
+      <b>การเก็บข้อมูล:</b> รายชื่อโครงการถูกจำไว้ใน browser เครื่องนี้ ส่วน Excel และเอกสารแนบอยู่ในหน่วยความจำของแท็บปัจจุบันเท่านั้น ไฟล์ไม่ถูกส่งขึ้น GitHub/server และจะหายเมื่อ Refresh หรือปิดแท็บ
     </section>
   </main>
+
+  <div class="modal-backdrop project-detail-modal" id="projectDetailModal" hidden>
+    <article class="modal project-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="projectDetailTitle">
+      <button class="modal-close" id="projectDetailClose" aria-label="ปิด">×</button>
+      <div id="projectDetailContent"></div>
+    </article>
+  </div>
 
   <div class="modal-backdrop project-modal" id="projectModal" hidden>
     <article class="modal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
@@ -79,24 +87,27 @@
         <header class="project-form-head">
           <div class="eyebrow">PROJECT SETUP</div>
           <h2 id="projectModalTitle">สร้างโครงการใหม่</h2>
-          <p>ตั้งชื่อโครงการให้ชัดเจนก่อนอัปโหลด Excel ข้อมูลของแต่ละโครงการจะถูกแยกออกจากกัน</p>
+          <p>ชื่อโครงการใช้เป็นตัวกรองหลักก่อนเข้าสู่ Progress Dashboard</p>
         </header>
         <div class="field">
           <label for="projectName">ชื่อโครงการ *</label>
-          <input id="projectName" type="text" maxlength="120" placeholder="เช่น โครงการปลูกป่าชายเลนสำหรับบุคคลภายนอก ปี 65">
+          <input id="projectName" type="text" maxlength="160" placeholder="เช่น โครงการปลูกป่าชายเลนสำหรับบุคคลภายนอก ปี 2565">
         </div>
         <div class="field">
           <label for="projectNote">รายละเอียดเพิ่มเติม</label>
-          <textarea id="projectNote" maxlength="300" placeholder="เช่น 160 แปลง · มีงานปีที่ 1–3"></textarea>
+          <textarea id="projectNote" maxlength="500" placeholder="เช่น 160 แปลง · มีข้อมูลปีที่ 1–3"></textarea>
         </div>
         <div class="project-form-error" id="projectFormError"></div>
         <div class="project-form-actions">
           <button class="btn ghost" id="projectCancel" type="button">ยกเลิก</button>
-          <button class="btn" id="projectSave" type="button">บันทึกและเปิดโครงการ</button>
+          <button class="btn" id="projectSave" type="button">บันทึกโครงการ</button>
         </div>
       </div>
     </article>
   </div>
+
+  <input id="projectExcelInput" type="file" accept=".xlsx,.xls,.xlsm,.xlsb" multiple hidden>
+  <input id="projectAttachmentInput" type="file" multiple hidden>
 
   <script src="project-shell.js"></script>
 </body>
