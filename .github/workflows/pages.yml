@@ -33,29 +33,11 @@ jobs:
           node --check work-monitor-upload/app.js
           node --check work-monitor-upload/excel-parser.js
           node --check work-monitor-multifile/app.js
-      - name: Normalize Buddhist-year dates in Carbon Token Gantt
+      - name: Validate Carbon Token Gantt
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('carbon-token-gantt/v4.js')
-          s = p.read_text(encoding='utf-8')
-          old1 = "if(v instanceof Date&&!isNaN(v)){const d=new Date(v);d.setHours(0,0,0,0);return d}"
-          new1 = "if(v instanceof Date&&!isNaN(v)){const d=new Date(v);if(d.getFullYear()>2400)d.setFullYear(d.getFullYear()-543);d.setHours(0,0,0,0);return d}"
-          old2 = "const d=new Date(s);return isNaN(d)?null:d}"
-          new2 = "const d=new Date(s);if(isNaN(d))return null;if(d.getFullYear()>2400)d.setFullYear(d.getFullYear()-543);d.setHours(0,0,0,0);return d}"
-          if old1 in s:
-              s = s.replace(old1, new1, 1)
-          elif new1 not in s:
-              raise SystemExit('Date-object normalization pattern not found')
-          if old2 in s:
-              s = s.replace(old2, new2, 1)
-          elif new2 not in s:
-              raise SystemExit('Text-date normalization pattern not found')
-          p.write_text(s, encoding='utf-8')
-          PY
-          node --check carbon-token-gantt/v4.js
-          grep -q 'v4.js' carbon-token-gantt/index.html
-          grep -q 'v4.css' carbon-token-gantt/index.html
+          node --check carbon-token-gantt/hkk.js
+          grep -q 'hkk.js' carbon-token-gantt/index.html
+          grep -q 'hkk.css' carbon-token-gantt/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
