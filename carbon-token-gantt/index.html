@@ -1,1 +1,110 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d5b49"><title>Carbon Credit Token — Project Plan Gantt</title><meta name="description" content="Gantt generated only from Project Plan with complete owner and Buddhist-year metadata"><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><link rel="stylesheet" href="v4.css"></head><body><header class="top"><div class="wrap topin"><div class="brand"><div class="logo">CC</div><div><b>CARBON CREDIT · TOKEN</b><small>PROJECT PLAN GANTT</small></div></div><label class="open" for="file">เปิด / เปลี่ยน Excel</label><input id="file" type="file" accept=".xlsx,.xls,.xlsm"></div></header><section class="hero"><div class="wrap"><div class="eyebrow">Implementation roadmap · Project Plan only</div><h1>Gantt Chart ที่อ่านข้อมูลครบจาก Excel</h1><p>อ่านเฉพาะ worksheet <b>Project Plan</b> และเก็บชื่อผู้รับผิดชอบทุกคอลัมน์ รวม Marketing/การตลาด, merged cells, ปี พ.ศ., Workstream, Milestone และ Progress</p><div class="chips"><span class="chip" id="cStart">เริ่ม: —</span><span class="chip" id="cEnd">สิ้นสุด: —</span><span class="chip" id="cFile">รอเปิด Excel</span></div></div></section><main class="main"><div class="wrap"><div class="stats"><div class="stat"><strong id="sSpan">—</strong><span>ระยะเวลาโครงการ</span></div><div class="stat"><strong id="sPeriods">—</strong><span id="sPeriodsL">ช่วงเวลาใน Gantt</span></div><div class="stat"><strong id="sGroups">—</strong><span>Workstreams / กลุ่มงาน</span></div><div class="stat"><strong id="sTasks">—</strong><span>Tasks ที่มีช่วงเวลา</span></div></div><div class="controls"><div class="filters" id="filters"><button class="filter on" data-f="all" style="--c:#12332d">ทั้งหมด</button></div><div class="tools"><input class="search" id="search" placeholder="ค้นหา task / คน / Marketing / ปี พ.ศ." disabled><button class="btn on" data-scale="quarter">ไตรมาส</button><button class="btn" data-scale="month">เดือน</button><button class="btn" id="today" disabled>วันนี้</button></div></div><div class="legend" id="legend"><span><i class="diamond"></i>Milestone</span></div><div class="audit" id="audit">เปิด Excel เพื่อเริ่มตรวจความครบถ้วนของ Project Plan</div><div class="shell"><div class="scroll" id="scroll"><div class="grid" id="grid"><div class="empty">เลือกไฟล์ Token Project Plan เพื่อสร้าง Gantt</div></div></div></div></div></main><dialog id="detail"><button class="close" id="close">×</button><div class="dlg"><h2 id="dTitle">—</h2><dl class="detail" id="dBody"></dl></div></dialog><script src="v4.js"></script></body></html>
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#17365D">
+  <title>Carbon Credit Token | Project Plan Gantt</title>
+  <meta name="description" content="Project Plan Gantt in Huay-Kha-Kaeng control-schedule style">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="hkk.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="page-width header-inner">
+      <div class="brand-block">
+        <div class="brand-code">CC</div>
+        <div>
+          <div class="brand-title">CARBON CREDIT · TOKEN PROJECT</div>
+          <div class="brand-subtitle">PROJECT PLAN CONTROL SCHEDULE</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="source-state" id="sourceState"><i></i><span>รอเปิด Project Plan</span></span>
+        <label class="primary-btn" for="workbookFile">เปิด / เปลี่ยน Excel</label>
+        <input id="workbookFile" type="file" accept=".xlsx,.xls,.xlsm">
+      </div>
+    </div>
+  </header>
+
+  <main class="page-width">
+    <section class="document-title">
+      <div>
+        <div class="section-code">PROJECT CONTROL · GANTT</div>
+        <h1>แผนภูมิแกนต์ระดับโครงการ</h1>
+        <p>รูปแบบตารางควบคุมแผนงานอ้างอิงแนวทาง Huay-Kha-Kaeng: WBS, Task, Accountibility, Status และ Control Window ในตารางเดียว</p>
+      </div>
+      <div class="project-facts" aria-label="สรุปโครงการ">
+        <div><span>ช่วงโครงการ</span><strong id="factRange">—</strong></div>
+        <div><span>รายการมีช่วงเวลา</span><strong id="factTasks">—</strong></div>
+        <div><span>Work Packages</span><strong id="factGroups">—</strong></div>
+        <div><span>Accountibility</span><strong id="factOwners">—</strong></div>
+      </div>
+    </section>
+
+    <section class="control-panel">
+      <div class="control-row">
+        <div class="field search-field">
+          <label for="taskSearch">ค้นหา</label>
+          <input id="taskSearch" type="search" placeholder="Task / WBS / ชื่อคน / Status" disabled>
+        </div>
+        <div class="field">
+          <label for="packageFilter">Work Package</label>
+          <select id="packageFilter" disabled><option value="all">ทั้งหมด</option></select>
+        </div>
+        <div class="field">
+          <label for="ownerFilter">Accountibility</label>
+          <select id="ownerFilter" disabled><option value="all">ทั้งหมด</option></select>
+        </div>
+        <div class="field">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter" disabled><option value="all">ทั้งหมด</option></select>
+        </div>
+        <div class="scale-control" role="group" aria-label="Timeline scale">
+          <button type="button" data-scale="quarter" class="active" disabled>ไตรมาส</button>
+          <button type="button" data-scale="month" disabled>เดือน</button>
+        </div>
+        <button type="button" class="secondary-btn" id="todayButton" disabled>ไปวันนี้</button>
+        <button type="button" class="secondary-btn" id="resetButton" disabled>ล้างตัวกรอง</button>
+      </div>
+      <div class="audit-line" id="auditLine">Data boundary: อ่านเฉพาะ worksheet “Project Plan”</div>
+    </section>
+
+    <section class="schedule-shell">
+      <div class="schedule-scroll" id="scheduleScroll" tabindex="0" aria-label="ตาราง Gantt แบบเลื่อนได้">
+        <div class="schedule-grid" id="scheduleGrid">
+          <div class="empty-state">
+            <strong>เปิดไฟล์ Token Project Plan เพื่อสร้างแผนภูมิแกนต์</strong>
+            <span>ระบบจะอ่านเฉพาะ worksheet “Project Plan” และใช้ Accountibility เป็นผู้รับผิดชอบหลัก</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="schedule-notes">
+      <article>
+        <h2>Legend</h2>
+        <div class="legend-row"><i class="legend-box normal"></i><span>ช่วงดำเนินงาน</span></div>
+        <div class="legend-row"><i class="legend-box summary"></i><span>Summary / Parent activity</span></div>
+        <div class="legend-row"><i class="legend-diamond"></i><span>Milestone / จุดส่งมอบ</span></div>
+        <div class="legend-row"><i class="legend-line"></i><span>เส้นวันนี้</span></div>
+      </article>
+      <article>
+        <h2>Data check</h2>
+        <p id="dataCheck">ยังไม่ได้โหลด Workbook</p>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="taskDialog">
+    <button class="dialog-close" id="dialogClose" aria-label="ปิด">×</button>
+    <div class="dialog-body">
+      <div class="dialog-kicker" id="dialogKicker">TASK DETAIL</div>
+      <h2 id="dialogTitle">—</h2>
+      <dl id="dialogDetails"></dl>
+    </div>
+  </dialog>
+
+  <script src="hkk.js"></script>
+</body>
+</html>
