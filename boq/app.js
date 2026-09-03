@@ -1,9 +1,126 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260903-3';
+  const VERSION = '20260903-5';
   const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02a.b64', 'app.bundle-02b.b64', 'app.bundle-03.b64'];
   const STYLE_PARTS = ['styles.bundle-01.b64'];
+
+  function replaceRequired(source, before, after, label) {
+    const index = source.indexOf(before);
+    if (index < 0) throw new Error(`โค้ดส่วน ${label} ไม่ตรงกับเวอร์ชันที่คาดไว้ กรุณารีเฟรชหน้า`);
+    return source.slice(0, index) + after + source.slice(index + before.length);
+  }
+
+  function patchAppSource(input) {
+    let source = input;
+    const patches = [
+      [
+        String.raw`if (plot && /^\s*\d+\s*-\s*[a-zก-๙0-9]+/i.test(description)) {`,
+        String.raw`if (plot && /^\s*\d+(?:\(\d+\))?\s*-\s*[a-zก-๙0-9]+/i.test(description)) {`,
+        'รหัสแปลงแบบวงเล็บใน Progress'
+      ],
+      [
+        String.raw`const installment = extractPaidInstallment(remark);
+      const operationYear = extractOperationYear(allText);`,
+        String.raw`const paymentContext = extractPaymentContext(allText);
+      const operationYear = paymentContext.operationYear;
+      const installments = paymentContext.installments;
+      const installment = installments[0] || '';`,
+        'ปีและงวดจาก ERP'
+      ],
+      [
+        String.raw`operationYear,
+        installment,
+        amount,`,
+        String.raw`operationYear,
+        installment,
+        installments,
+        amount,`,
+        'รายการหลายงวดใน ERP'
+      ],
+      [
+        String.raw`if (transaction.installment) {
+        group.installmentNet.set(transaction.installment, (group.installmentNet.get(transaction.installment) || 0) + transaction.amount);
+      }`,
+        String.raw`const installments = transaction.installments?.length
+        ? transaction.installments
+        : transaction.installment ? [transaction.installment] : [];
+      installments.forEach((installment) => {
+        group.installmentNet.set(installment, (group.installmentNet.get(installment) || 0) + transaction.amount);
+      });`,
+        'การรวมหลายงวดจาก ERP'
+      ],
+      [
+        String.raw`return cleaned.replace(/-\d+$/, '');`,
+        String.raw`return cleaned.replace(/-\d+(?:\(\d+\))?$/, '');`,
+        'รหัสโครงการที่มี suffix วงเล็บ'
+      ],
+      [
+        String.raw`const match = cleaned.match(/\b(\d+\s*-\s*[A-Z]{2,}[A-Z0-9]*)\b/);`,
+        String.raw`const match = cleaned.match(/(?<![A-Z0-9])(\d+(?:\(\d+\))?\s*-\s*[A-Z]{2,}[A-Z0-9]*)(?![A-Z0-9])/);`,
+        'รหัสแปลง STC/VSD แบบวงเล็บ'
+      ],
+      [
+        String.raw`  function extractPaidInstallment(value) {
+    const source = toArabicDigits(text(value));
+    let match = source.match(/งวด(?:งาน|เงิน)?\s*(?:ที่)?\s*(\d{1,2})/i);
+    if (match) return String(Number(match[1]));
+    if (/เบิก|ค่าจ้าง|ปลูก|บำรุง/i.test(source)) {
+      match = source.match(/ครั้ง(?:ที่)?\s*(\d{1,2})/i);
+      if (match) return String(Number(match[1]));
+    }
+    return '';
+  }`,
+        String.raw`  function extractPaymentContext(value) {
+    const source = toArabicDigits(text(value));
+    const yearMatches = [...source.matchAll(/ปีที่\s*(\d{1,2})/ig)];
+    let operationYear = null;
+    let installmentSource = source;
+
+    if (yearMatches.length) {
+      const selectedYear = yearMatches.at(-1);
+      operationYear = Number(selectedYear[1]);
+      installmentSource = source.slice(selectedYear.index ?? 0);
+    }
+
+    return { operationYear, installments: extractPaidInstallments(installmentSource) };
+  }
+
+  function extractPaidInstallments(value) {
+    const source = toArabicDigits(text(value));
+    const installments = [];
+    const marker = /งวด(?:งาน|เงิน)?\s*(?:ที่)?\s*(\d{1,2})/ig;
+    let match;
+
+    while ((match = marker.exec(source))) {
+      installments.push(String(Number(match[1])));
+      const tail = source.slice(marker.lastIndex, marker.lastIndex + 48);
+      const continuation = tail.match(/^\s*((?:(?:,|และ|\/|&|-|ถึง)\s*(?:งวด(?:งาน|เงิน)?\s*(?:ที่)?\s*)?\d{1,2})+)/i);
+      if (continuation) {
+        const extra = [...continuation[1].matchAll(/\d{1,2}/g)].map((item) => String(Number(item[0])));
+        installments.push(...extra);
+      }
+    }
+
+    if (!installments.length && /เบิก|ค่าจ้าง|ปลูก|บำรุง/i.test(source)) {
+      const fallback = source.match(/ครั้ง(?:ที่)?\s*(\d{1,2})/i);
+      if (fallback) installments.push(String(Number(fallback[1])));
+    }
+    return uniqueInstallments(installments);
+  }
+
+  function extractPaidInstallment(value) {
+    return extractPaidInstallments(value)[0] || '';
+  }`,
+        'การอ่านหลายงวดและข้อความหลายปี'
+      ]
+    ];
+
+    patches.forEach(([before, after, label]) => {
+      source = replaceRequired(source, before, after, label);
+    });
+    return source;
+  }
 
   async function fetchJoined(paths) {
     const parts = await Promise.all(paths.map(async (path) => {
@@ -50,10 +167,11 @@
       fetchJoined(STYLE_PARTS),
       fetchJoined(APP_PARTS)
     ]);
-    const [styleSource, appSource] = await Promise.all([
+    const [styleSource, originalAppSource] = await Promise.all([
       gunzipText(styleArchive),
       gunzipText(appArchive)
     ]);
+    const appSource = patchAppSource(originalAppSource);
 
     const style = document.createElement('style');
     style.id = 'boq-dashboard-styles';
