@@ -2,118 +2,225 @@
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0b3b35">
-  <title>Project Finance Control | Forest Project</title>
-  <meta name="description" content="ติดตาม BOQ ยอดจ่ายและคงเหลือ โดยเริ่มจากรหัสโครงการและเจาะลงถึงรายแปลง">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a4039">
+  <meta name="description" content="อัปโหลด Excel เพื่อสร้าง Dashboard และรายงาน BOQ/การจ่ายเงินรายโครงการ รายแปลง และรายปี">
+  <title>BOQ & Payment Report Builder</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260903-1">
 </head>
 <body>
   <header class="topbar">
-    <div>
-      <div class="eyebrow">PROJECT CODE → PORTFOLIO → PLOT → INSTALLMENT</div>
-      <h1>Project Finance Control</h1>
-      <p>ติดตามมูลค่าสัญญา จ่ายแล้ว คงเหลือ และงวดที่ต้องเร่งรัด</p>
-    </div>
-    <nav class="topnav">
+    <a class="brand" href="../" aria-label="กลับหน้า Project Dashboard">
+      <span class="brand-mark" aria-hidden="true">TC</span>
+      <span>
+        <small>PROJECT MANAGEMENT</small>
+        <strong>BOQ & Payment Report</strong>
+      </span>
+    </a>
+    <nav class="topnav" aria-label="เมนูหลัก">
       <a href="../">Project Dashboard</a>
       <a href="../work-monitor/">Work Monitor</a>
+      <a class="active" href="./" aria-current="page">BOQ Report</a>
     </nav>
   </header>
 
-  <main class="shell">
-    <section class="notice">
-      <div><strong>หลักการจับข้อมูลใหม่</strong><span>เริ่มจากรหัสโครงการ แล้ว Tag ประเภทงาน ก่อนผูกกับรหัสแปลงและเลขสัญญา</span></div>
-      <button class="btn" id="openAllSpend">ดูเงินจ่ายแล้วทุกหมวดหมู่</button>
-    </section>
-
-    <section class="panel filters" aria-label="ตัวกรอง">
-      <div class="field wide">
-        <label for="search">ค้นหา</label>
-        <input id="search" type="search" placeholder="รหัสโครงการ, แปลง, สัญญา, จังหวัด, ชื่อ T-VER...">
+  <main class="page-shell">
+    <section class="hero panel">
+      <div class="hero-copy">
+        <div class="eyebrow">EXCEL → VALIDATE → DASHBOARD → REPORT</div>
+        <h1>สร้าง Dashboard และรายงาน BOQ จาก Excel</h1>
+        <p>เลือกไฟล์ Excel แล้วระบบจะตรวจโครงสร้าง รวมข้อมูลรายโครงการ–รายแปลง–รายปี และสร้างรายงานการจ่ายเงินให้ทันที</p>
+        <div class="privacy-note"><span aria-hidden="true">✓</span> ประมวลผลภายในเบราว์เซอร์ ไฟล์ไม่ถูกส่งขึ้นเซิร์ฟเวอร์</div>
       </div>
-      <div class="field">
-        <label for="portfolio">ประเภทโครงการ</label>
-        <select id="portfolio"></select>
-      </div>
-      <div class="field">
-        <label for="projectCode">รหัสโครงการ</label>
-        <select id="projectCode"><option value="">ทั้งหมด</option></select>
-      </div>
-      <div class="field">
-        <label for="year">ปีดำเนินงาน</label>
-        <select id="year"></select>
-      </div>
-      <div class="field">
-        <label for="company">ผู้รับเหมา</label>
-        <select id="company"><option value="">ทั้งหมด</option></select>
-      </div>
-      <div class="field">
-        <label for="province">จังหวัด</label>
-        <select id="province"><option value="">ทั้งหมด</option></select>
-      </div>
-      <div class="field">
-        <label for="token">TOKEN</label>
-        <select id="token"><option value="">ทั้งหมด</option></select>
-      </div>
-      <button class="btn secondary" id="reset">ล้างตัวกรอง</button>
-    </section>
-
-    <section class="portfolio-grid" id="portfolioCards"></section>
-    <section class="kpis" id="kpis"></section>
-
-    <section class="grid-2">
-      <article class="panel">
-        <div class="section-head"><div><h2>สถานะรายปี</h2><p>BOQ เทียบ ERP AP ของแปลงที่ผ่านตัวกรอง</p></div></div>
-        <div id="yearBars" class="year-bars"></div>
-      </article>
-      <article class="panel">
-        <div class="section-head"><div><h2>แยกประเภทงานตามรหัสโครงการ</h2><p>งานที่ไม่มี BOQ ตายตัวแสดงเป็นยอดสะสมถึงวันที่ ERP ล่าสุด</p></div></div>
-        <div id="workTypeBars" class="work-bars"></div>
-      </article>
-    </section>
-
-    <section class="panel code-panel">
-      <div class="section-head"><div><h2>Project Code Register</h2><p>รหัสโครงการคือจุดตั้งต้นในการ Tag รายการเงิน</p></div></div>
-      <div class="table-wrap">
-        <table class="compact">
-          <thead><tr><th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ผู้รับเหมา</th><th class="num">ปลูก/บำรุง</th><th class="num">PDD</th><th class="num">VVB</th><th class="num">ลงพื้นที่</th><th class="num">ตรวจรอดตาย</th><th class="num">กองทุนชุมชน</th><th class="num">รวม AP</th></tr></thead>
-          <tbody id="codeRows"></tbody>
-        </table>
+      <div class="stepper" aria-label="ขั้นตอนการใช้งาน">
+        <div class="step active" id="stepUpload"><span>1</span><div><strong>อัปโหลด</strong><small>เลือกไฟล์ Excel</small></div></div>
+        <div class="step" id="stepReview"><span>2</span><div><strong>ตรวจข้อมูล</strong><small>ตรวจการจับคู่คอลัมน์</small></div></div>
+        <div class="step" id="stepReport"><span>3</span><div><strong>ดูรายงาน</strong><small>กรองและส่งออก</small></div></div>
       </div>
     </section>
 
-    <section class="panel table-panel" id="plotPanel">
-      <div class="section-head table-head">
-        <div><h2>ติดตามรายแปลง</h2><p id="tableSubtitle"></p></div>
-        <div class="table-actions">
-          <label>เรียงตาม <select id="sort"><option value="balance">คงเหลือสูงสุด</option><option value="paid">จ่ายแล้วสูงสุด</option><option value="boq">BOQ สูงสุด</option><option value="plot">รหัสแปลง</option></select></label>
-          <button class="btn" id="exportCsv">Export CSV</button>
+    <section class="upload-layout">
+      <article class="upload-card panel">
+        <div class="section-heading">
+          <div>
+            <span class="section-kicker">นำเข้าข้อมูล</span>
+            <h2>อัปโหลดไฟล์ Excel</h2>
+          </div>
+          <button class="text-button" id="downloadTemplate" type="button">ดาวน์โหลดแม่แบบ</button>
         </div>
+
+        <label class="dropzone" id="dropzone" for="fileInput" tabindex="0">
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden>
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5v3A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <strong>ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์</strong>
+          <span>รองรับ .xlsx, .xls, .xlsm และ .csv — เลือกหลายไฟล์เพื่อรวม BOQ/Progress กับ ERP ได้</span>
+          <span class="choose-file">เลือกไฟล์ Excel</span>
+        </label>
+
+        <div class="upload-actions">
+          <button class="button ghost" id="addMoreFiles" type="button" hidden>เพิ่มไฟล์</button>
+          <button class="button danger-ghost" id="clearData" type="button" hidden>ล้างข้อมูลทั้งหมด</button>
+        </div>
+        <div class="processing" id="processing" hidden role="status" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          <div><strong id="processingTitle">กำลังอ่านไฟล์…</strong><small id="processingDetail">โปรดอย่าปิดหน้านี้ระหว่างประมวลผล</small></div>
+        </div>
+        <div class="file-list" id="fileList" aria-live="polite"></div>
+      </article>
+
+      <aside class="schema-card panel">
+        <div class="section-heading compact">
+          <div>
+            <span class="section-kicker">รูปแบบผลลัพธ์</span>
+            <h2>คอลัมน์รายงาน</h2>
+          </div>
+          <span class="schema-count">13 คอลัมน์</span>
+        </div>
+        <p>ระบบจับชื่อคอลัมน์ภาษาไทย/อังกฤษที่ใกล้เคียงกัน และคำนวณยอดคงเหลือให้อัตโนมัติเมื่อมีมูลค่าสัญญาและยอดจ่ายแล้ว</p>
+        <div class="schema-grid" id="schemaGrid"></div>
+      </aside>
+    </section>
+
+    <section class="import-review panel" id="importReview" hidden>
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">ตรวจผลการนำเข้า</span>
+          <h2>ไฟล์และชีตที่ระบบอ่านได้</h2>
+        </div>
+        <div class="review-summary" id="reviewSummary"></div>
       </div>
-      <div id="plotUnavailable" class="empty-state" hidden></div>
-      <div class="table-wrap" id="plotTableWrap">
-        <table>
-          <thead><tr>
-            <th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ชื่อ T-VER</th><th>TOKEN</th><th>รหัสแปลง</th><th>จังหวัด</th><th class="num">พื้นที่</th><th class="num" id="boqYearHead">BOQ ปี 3</th><th>งวดล่าสุด</th><th>งวดค้าง</th><th class="num">จ่ายแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th></th>
-          </tr></thead>
-          <tbody id="plotRows"></tbody>
-        </table>
+      <div class="review-grid" id="reviewGrid"></div>
+    </section>
+
+    <section class="mapping-panel panel" id="mappingPanel" hidden>
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">ตั้งค่าการจับคู่</span>
+          <h2>เลือกคอลัมน์จากชีตด้วยตนเอง</h2>
+          <p>ใช้ส่วนนี้เมื่อชื่อหัวตารางในไฟล์ไม่ตรงกับรูปแบบที่ระบบรู้จัก</p>
+        </div>
+        <button class="icon-button" id="closeMapping" type="button" aria-label="ปิดการตั้งค่าคอลัมน์">×</button>
+      </div>
+      <div class="mapping-toolbar">
+        <label>ไฟล์ / ชีต<select id="mappingSheet"></select></label>
+        <label>แถวหัวตาราง<select id="mappingHeaderRow"></select></label>
+      </div>
+      <div class="mapping-grid" id="mappingGrid"></div>
+      <div class="preview-wrap">
+        <div class="preview-title"><strong>ตัวอย่างข้อมูล</strong><span id="mappingPreviewNote"></span></div>
+        <div class="table-scroll compact-scroll"><table class="preview-table" id="mappingPreview"></table></div>
+      </div>
+      <div class="mapping-actions">
+        <button class="button secondary" id="autoMapping" type="button">จับคู่อัตโนมัติอีกครั้ง</button>
+        <button class="button primary" id="applyMapping" type="button">นำเข้าตามคอลัมน์ที่เลือก</button>
       </div>
     </section>
 
-    <footer><span id="sourceNote"></span><span>ยอดจ่ายระดับแปลงใช้ AP ที่ Tag เป็นงานปลูก/บำรุง และไม่รวม Clear Advance/PDD/VVB</span></footer>
+    <section class="dashboard" id="dashboard" hidden>
+      <section class="filter-panel panel">
+        <div class="filter-heading">
+          <div>
+            <span class="section-kicker">ตัวกรองรายงาน</span>
+            <h2>ภาพรวมตามข้อมูลที่เลือก</h2>
+          </div>
+          <button class="text-button" id="resetFilters" type="button">ล้างตัวกรอง</button>
+        </div>
+        <div class="filters">
+          <label class="search-field"><span>ค้นหา</span><input id="search" type="search" placeholder="รหัสโครงการ รหัสแปลง จังหวัด ชื่อ T-VER…"></label>
+          <label><span>ประเภทโครงการ</span><select id="categoryFilter"></select></label>
+          <label><span>ปีดำเนินงาน</span><select id="yearFilter"></select></label>
+          <label><span>จังหวัด</span><select id="provinceFilter"></select></label>
+          <label><span>ประเภท TOKEN</span><select id="tokenFilter"></select></label>
+          <label><span>สถานะการจ่าย</span><select id="statusFilter"></select></label>
+          <label><span>เรียงตาม</span><select id="sortBy">
+            <option value="balance-desc">ยอดคงเหลือมากที่สุด</option>
+            <option value="contract-desc">มูลค่าสัญญามากที่สุด</option>
+            <option value="paid-desc">ยอดจ่ายแล้วมากที่สุด</option>
+            <option value="project-asc">รหัสโครงการ</option>
+            <option value="plot-asc">รหัสแปลง</option>
+          </select></label>
+        </div>
+      </section>
+
+      <section class="kpi-grid" id="kpiGrid" aria-label="ตัวชี้วัดสำคัญ"></section>
+
+      <section class="chart-grid">
+        <article class="chart-card panel">
+          <div class="chart-head"><div><span class="section-kicker">PAYMENT STATUS</span><h2>สถานะการจ่ายเงิน</h2></div><span id="statusChartTotal"></span></div>
+          <div class="donut-layout"><div class="donut" id="statusDonut"><div><strong id="donutRate">0%</strong><span>จ่ายแล้ว</span></div></div><div class="legend" id="statusLegend"></div></div>
+        </article>
+        <article class="chart-card panel">
+          <div class="chart-head"><div><span class="section-kicker">OPERATION YEAR</span><h2>มูลค่าสัญญาและยอดจ่ายตามปี</h2></div></div>
+          <div class="bar-list" id="yearChart"></div>
+        </article>
+        <article class="chart-card panel">
+          <div class="chart-head"><div><span class="section-kicker">PROJECT CATEGORY</span><h2>มูลค่าสัญญาตามประเภทโครงการ</h2></div></div>
+          <div class="bar-list" id="categoryChart"></div>
+        </article>
+        <article class="chart-card panel">
+          <div class="chart-head"><div><span class="section-kicker">OUTSTANDING</span><h2>จังหวัดที่มียอดคงเหลือสูง</h2></div></div>
+          <div class="bar-list" id="provinceChart"></div>
+        </article>
+      </section>
+
+      <section class="quality-panel panel" id="qualityPanel">
+        <div class="section-heading compact">
+          <div><span class="section-kicker">DATA QUALITY</span><h2>คุณภาพและข้อสังเกตของข้อมูล</h2></div>
+          <button class="text-button" id="toggleQuality" type="button" aria-expanded="false">ดูรายละเอียด</button>
+        </div>
+        <div class="quality-summary" id="qualitySummary"></div>
+        <div class="quality-details" id="qualityDetails" hidden></div>
+      </section>
+
+      <section class="report-panel panel">
+        <div class="report-head">
+          <div>
+            <span class="section-kicker">BOQ & PAYMENT REGISTER</span>
+            <h2>รายงานรายโครงการ / รายแปลง / รายปี</h2>
+            <p id="reportSubtitle"></p>
+          </div>
+          <div class="report-actions">
+            <button class="button ghost" id="printReport" type="button">พิมพ์รายงาน</button>
+            <button class="button secondary" id="exportCsv" type="button">Export CSV</button>
+            <button class="button primary" id="exportExcel" type="button">Export Excel</button>
+          </div>
+        </div>
+        <div class="table-scroll report-scroll">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>รหัสโครงการ</th>
+                <th>หมวดหมู่/<br>ประเภทโครงการ</th>
+                <th>ชื่อโครงการ T-VER<br>กรณีโครงการปลูกป่าฯ</th>
+                <th>ประเภท<br>TOKEN X</th>
+                <th>รหัสแปลง</th>
+                <th>จังหวัด</th>
+                <th class="number">เนื้อที่สัญญา<br>(ไร่)</th>
+                <th class="number">การดำเนินงาน<br>ปีที่</th>
+                <th class="number">มูลค่าสัญญา<br>ปีที่ …</th>
+                <th>งวดเงินล่าสุด<br>ที่จ่ายเงินแล้ว</th>
+                <th>งวดเงินที่<br>ยังไม่จ่ายเงิน</th>
+                <th class="number">ยอดเงินที่จ่ายแล้ว<br>(บาท)</th>
+                <th class="number">ยอดคงเหลือ<br>(บาท)</th>
+              </tr>
+            </thead>
+            <tbody id="reportRows"></tbody>
+          </table>
+        </div>
+        <div class="empty-report" id="emptyReport" hidden>
+          <strong>ไม่พบข้อมูลตามตัวกรอง</strong><span>ลองล้างตัวกรองหรือค้นหาด้วยคำอื่น</span>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </section>
+    </section>
   </main>
 
-  <div class="modal-backdrop" id="modalBackdrop" hidden>
-    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button class="modal-close" id="modalClose" aria-label="ปิด">×</button>
-      <div id="modalContent"></div>
-    </article>
-  </div>
+  <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 
-  <script src="data.js"></script>
-  <script src="app.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script src="app.js?v=20260903-1" defer></script>
 </body>
 </html>
