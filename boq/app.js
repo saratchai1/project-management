@@ -1,8 +1,8 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260903-2';
-  const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02.b64', 'app.bundle-03.b64'];
+  const VERSION = '20260903-3';
+  const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02a.b64', 'app.bundle-02b.b64', 'app.bundle-03.b64'];
   const STYLE_PARTS = ['styles.bundle-01.b64'];
 
   async function fetchJoined(paths) {
