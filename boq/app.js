@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260903-5';
+  const VERSION = '20260904-1';
   const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02a.b64', 'app.bundle-02b.b64', 'app.bundle-03.b64'];
   const STYLE_PARTS = ['styles.bundle-01.b64'];
 
@@ -113,12 +113,60 @@
     return extractPaidInstallments(value)[0] || '';
   }`,
         'การอ่านหลายงวดและข้อความหลายปี'
+      ],
+      [
+        String.raw`category: inferCategory(allText, projectCode, rawSheet.fileName),`,
+        String.raw`category: inferCategory(projectDescription, projectCode, rawSheet.fileName),`,
+        'ไม่ใช้เลข voucher/WO เป็นปีประเภทโครงการ'
       ]
     ];
 
     patches.forEach(([before, after, label]) => {
       source = replaceRequired(source, before, after, label);
     });
+
+    const categoryStart = source.indexOf("  function inferCategory(value, projectCode = '', fileName = '') {");
+    const categoryEnd = source.indexOf('\n\n  function inferTokenType', categoryStart);
+    if (categoryStart < 0 || categoryEnd < 0) {
+      throw new Error('โค้ดส่วนประเภทโครงการไม่ตรงกับเวอร์ชันที่คาดไว้ กรุณารีเฟรชหน้า');
+    }
+    const categorySource = String.raw`  function inferCategory(value, projectCode = '', fileName = '') {
+    const source = String(value || '') + ' ' + String(projectCode || '') + ' ' + String(fileName || '');
+    const normalized = toArabicDigits(source);
+    const projectText = toArabicDigits(String(value || ''));
+    const isCommunity = /ชุมชน|community/i.test(normalized);
+    const isExternal = !isCommunity && /บุคคลภายนอก|ภายนอก|external|\b(?:STC|VSD)\b/i.test(normalized);
+    const projectKey = baseProjectCode(projectCode) || cleanProjectCode(projectCode);
+    const knownProjectYears = {
+      TCGMCR6508: '2565',
+      TCGMCR6607: '2565',
+      TCGMCR6609: '2566',
+      TCGMCR67003: '2566',
+      TCGMCR67004: '2566'
+    };
+    let year = '';
+
+    const explicitFullYear = projectText.match(/(?:ประจำปี(?:\s*พ\.?\s*ศ\.?)?|พ\.?\s*ศ\.?)\s*(25\d{2})(?!\d)/i);
+    const explicitShortYear = projectText.match(/\(\s*ปี\s*(\d{2})\s*\)/i);
+    if (explicitFullYear) year = explicitFullYear[1];
+    else if (explicitShortYear) year = '25' + explicitShortYear[1];
+    else if (knownProjectYears[projectKey]) year = knownProjectYears[projectKey];
+    else {
+      const codeYear = cleanProjectCode(projectCode).match(/TCG[A-Z]+(6\d)/);
+      if (codeYear) year = '25' + codeYear[1];
+      else {
+        const plainYear = projectText.match(/(?:^|[\s(])ปี\s*(25\d{2})(?!\d)/i);
+        if (plainYear) year = plainYear[1];
+      }
+    }
+
+    if (/ปลูกป่า|คาร์บอน|mangrove|forest/i.test(normalized) || /^TCG/i.test(projectCode)) {
+      const audience = isCommunity ? ' (สำหรับชุมชน)' : isExternal ? ' (สำหรับบุคคลภายนอก)' : '';
+      return 'โครงการปลูกป่าชายเลน เพื่อประโยชน์จากคาร์บอนเครดิต' + audience + (year ? ' ปี ' + year : '');
+    }
+    return '';
+  }`;
+    source = source.slice(0, categoryStart) + categorySource + source.slice(categoryEnd);
     return source;
   }
 
