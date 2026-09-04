@@ -1,34 +1,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260904-5';
+  const VERSION = '20260904-6';
   const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02a.b64', 'app.bundle-02b.b64', 'app.bundle-03.b64'];
   const STYLE_PARTS = ['styles.bundle-01.b64'];
-
-
-  function patchAppSource(source) {
-    const before = String.raw`    const yearMarkers = [...source.matchAll(/ปีที่\s*(\d{1,2})/ig)];
-    if (!yearMarkers.length) {
-      const inferredYear = cleanCostCode(costCode) === 'S090001' ? 1 : null;
-      return [{ year: inferredYear, installments: extractPaidInstallments(source) }];
-    }
-
-    const contexts = yearMarkers.map((marker, index) => {`;
-    const after = String.raw`    const yearMarkers = [...source.matchAll(/ปีที่\s*(\d{1,2})/ig)];
-    if (!yearMarkers.length) {
-      const inferredYear = cleanCostCode(costCode) === 'S090001' ? 1 : null;
-      return [{ year: inferredYear, installments: extractPaidInstallments(source) }];
-    }
-
-    const distinctYears = [...new Set(yearMarkers.map((marker) => Number(marker[1])))];
-    if (distinctYears.length === 1) {
-      return [{ year: distinctYears[0], installments: extractPaidInstallments(source) }];
-    }
-
-    const contexts = yearMarkers.map((marker, index) => {`;
-    if (!source.includes(before)) throw new Error('Parser ERP ไม่ตรงกับเวอร์ชันที่คาดไว้');
-    return source.replace(before, after);
-  }
 
   async function fetchJoined(paths) {
     const parts = await Promise.all(paths.map(async (path) => {
@@ -75,11 +50,10 @@
       fetchJoined(STYLE_PARTS),
       fetchJoined(APP_PARTS)
     ]);
-    const [styleSource, rawAppSource] = await Promise.all([
+    const [styleSource, appSource] = await Promise.all([
       gunzipText(styleArchive),
       gunzipText(appArchive)
     ]);
-    const appSource = patchAppSource(rawAppSource);
 
     const style = document.createElement('style');
     style.id = 'boq-dashboard-styles';
