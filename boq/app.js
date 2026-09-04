@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260904-2';
+  const VERSION = '20260904-3';
   const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02a.b64', 'app.bundle-02b.b64', 'app.bundle-03.b64'];
   const STYLE_PARTS = ['styles.bundle-01.b64'];
 
@@ -113,6 +113,26 @@
     return extractPaidInstallments(value)[0] || '';
   }`,
         'การอ่านหลายงวดและข้อความหลายปี'
+      ],
+      [
+        String.raw`const plotCode = extractPlotCode(projectDescription) || extractPlotCode(remark);
+      if (!plotCode) {
+        noPlot += 1;
+        continue;
+      }`,
+        String.raw`let plotCode = extractPlotCode(projectDescription) || extractPlotCode(remark);
+      if (!plotCode) {
+        const projectUnitReference = cleanProjectCode(projectReference);
+        const hasInstallment = extractPaidInstallments(remark).length > 0;
+        if (hasInstallment && /^TCG[A-Z0-9]+-\d+(?:\(\d+\))?$/i.test(projectUnitReference)) {
+          plotCode = projectUnitReference;
+        }
+      }
+      if (!plotCode) {
+        noPlot += 1;
+        continue;
+      }`,
+        'รองรับหน่วยสัญญาชุมชนจาก Ref.Code Project'
       ],
       [
         String.raw`category: inferCategory(allText, projectCode, rawSheet.fileName),`,
