@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260904-1';
+  const VERSION = '20260904-2';
   const APP_PARTS = ['app.bundle-01.b64', 'app.bundle-02a.b64', 'app.bundle-02b.b64', 'app.bundle-03.b64'];
   const STYLE_PARTS = ['styles.bundle-01.b64'];
 
@@ -118,6 +118,51 @@
         String.raw`category: inferCategory(allText, projectCode, rawSheet.fileName),`,
         String.raw`category: inferCategory(projectDescription, projectCode, rawSheet.fileName),`,
         'ไม่ใช้เลข voucher/WO เป็นปีประเภทโครงการ'
+      ],
+      [
+        String.raw`pageSize: 50,
+    toastTimer: null`,
+        String.raw`pageSize: 50,
+    toastTimer: null,
+    dashboardCreated: false`,
+        'สถานะคง Dashboard ใน session'
+      ],
+      [
+        String.raw`if (state.records.length) {
+      $('stepReport').classList.add('active');
+      $('dashboard').hidden = false;`,
+        String.raw`if (state.records.length) {
+      state.dashboardCreated = true;
+      $('stepReport').classList.add('active');
+      $('dashboard').hidden = false;`,
+        'จำว่า Dashboard เคยสร้างแล้ว'
+      ],
+      [
+        String.raw`} else {
+      $('dashboard').hidden = true;
+      const unknown = state.sheetResults.find((item) => item.kind === 'unknown');`,
+        String.raw`} else {
+      if (!state.dashboardCreated) $('dashboard').hidden = true;
+      const unknown = state.sheetResults.find((item) => item.kind === 'unknown');`,
+        'ไม่ซ่อน Dashboard เดิมเมื่อไฟล์ใหม่ไม่มีข้อมูล'
+      ],
+      [
+        String.raw`refreshFilterOptions();
+    $('dashboard').hidden = false;
+    $('mappingPanel').hidden = true;`,
+        String.raw`refreshFilterOptions();
+    state.dashboardCreated = true;
+    $('dashboard').hidden = false;
+    $('mappingPanel').hidden = true;`,
+        'คง Dashboard หลัง Mapping'
+      ],
+      [
+        String.raw`state.mappingIndex = -1;
+    state.page = 1;`,
+        String.raw`state.mappingIndex = -1;
+    state.dashboardCreated = false;
+    state.page = 1;`,
+        'รีเซ็ต Dashboard เฉพาะเมื่อล้างข้อมูล'
       ]
     ];
 
