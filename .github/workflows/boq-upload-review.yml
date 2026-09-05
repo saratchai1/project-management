@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build corrected BOQ upload runtime
-        run: python boq/build-runtime.py
+        run: python boq/build.py
       - name: Prepare exact browser dependency and deployed bundle
         run: |
           mkdir -p /tmp/boq-runtime
@@ -42,11 +42,8 @@ jobs:
           if (XLSX.version !== '0.20.3') throw new Error('Unexpected SheetJS version: ' + XLSX.version);
           console.log('Compiled bundle syntax and SheetJS 0.20.3 verified');
           NODE
-      - name: Run upload regression tests when present
-        run: |
-          if [ -f boq/tests/runtime-regression.cjs ]; then
-            BOQ_TEST_REPORT=/tmp/boq-runtime/regression-results.json BOQ_XLSX_PATH=/tmp/boq-runtime/xlsx.full.min.js BOQ_SOURCE_PATH=/tmp/boq-runtime/boq-upload.source.js node boq/tests/runtime-regression.cjs
-          fi
+      - name: Run upload regression tests
+        run: BOQ_TEST_REPORT=/tmp/boq-runtime/regression-results.json BOQ_XLSX_PATH=/tmp/boq-runtime/xlsx.full.min.js BOQ_SOURCE_PATH=/tmp/boq-runtime/boq-upload.source.js node boq/tests/runtime-regression.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

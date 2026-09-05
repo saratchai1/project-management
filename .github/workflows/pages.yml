@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and validate BOQ upload runtime
         run: |
-          python boq/build-runtime.py
+          python boq/build.py
           node --check boq/upload.source.js
           BOQ_SOURCE_PATH=boq/upload.source.js node boq/tests/runtime-regression.cjs
       - name: Validate dashboard data
