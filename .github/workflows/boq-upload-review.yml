@@ -1,0 +1,51 @@
+name: Validate BOQ upload runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'boq/**'
+      - '.github/workflows/boq-upload-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare exact browser dependency and deployed bundle
+        run: |
+          mkdir -p /tmp/boq-runtime
+          curl --fail --silent --show-error --location --retry 3 https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js -o /tmp/boq-runtime/xlsx.full.min.js
+          node <<'NODE'
+          const fs = require('node:fs');
+          const zlib = require('node:zlib');
+          const vm = require('node:vm');
+          const loader = fs.readFileSync('boq/app.js', 'utf8');
+          new vm.Script(loader, {filename:'boq/app.js'});
+          const match = loader.match(/const APP_PARTS = (\[[^;]+\]);/);
+          if (!match) throw new Error('Missing bundle manifest');
+          const parts = vm.runInNewContext(match[1]);
+          const archive = parts.map(name => fs.readFileSync('boq/' + name, 'utf8').trim()).join('');
+          const source = zlib.gunzipSync(Buffer.from(archive, 'base64')).toString('utf8');
+          new vm.Script(source, {filename:'boq-upload.source.js'});
+          fs.writeFileSync('/tmp/boq-runtime/boq-upload.source.js', source);
+          const XLSX = require('/tmp/boq-runtime/xlsx.full.min.js');
+          if (XLSX.version !== '0.20.3') throw new Error('Unexpected SheetJS version: ' + XLSX.version);
+          console.log('Bundle syntax and SheetJS 0.20.3 verified');
+          NODE
+      - name: Run upload regression tests when present
+        run: |
+          if [ -f boq/tests/runtime-regression.cjs ]; then
+            BOQ_XLSX_PATH=/tmp/boq-runtime/xlsx.full.min.js BOQ_SOURCE_PATH=/tmp/boq-runtime/boq-upload.source.js node boq/tests/runtime-regression.cjs
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: boq-runtime-reviewed
+          path: /tmp/boq-runtime
+          retention-days: 7
