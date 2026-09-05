@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Build corrected BOQ upload runtime
+        run: python boq/build-runtime.py
       - name: Prepare exact browser dependency and deployed bundle
         run: |
           mkdir -p /tmp/boq-runtime
@@ -33,15 +35,17 @@ jobs:
           const archive = parts.map(name => fs.readFileSync('boq/' + name, 'utf8').trim()).join('');
           const source = zlib.gunzipSync(Buffer.from(archive, 'base64')).toString('utf8');
           new vm.Script(source, {filename:'boq-upload.source.js'});
+          if(source !== fs.readFileSync('boq/upload.source.js','utf8')) throw new Error('Generated bundle differs from compiled source');
           fs.writeFileSync('/tmp/boq-runtime/boq-upload.source.js', source);
+          fs.copyFileSync('boq/BUILD-AUDIT.json','/tmp/boq-runtime/BUILD-AUDIT.json');
           const XLSX = require('/tmp/boq-runtime/xlsx.full.min.js');
           if (XLSX.version !== '0.20.3') throw new Error('Unexpected SheetJS version: ' + XLSX.version);
-          console.log('Bundle syntax and SheetJS 0.20.3 verified');
+          console.log('Compiled bundle syntax and SheetJS 0.20.3 verified');
           NODE
       - name: Run upload regression tests when present
         run: |
           if [ -f boq/tests/runtime-regression.cjs ]; then
-            BOQ_XLSX_PATH=/tmp/boq-runtime/xlsx.full.min.js BOQ_SOURCE_PATH=/tmp/boq-runtime/boq-upload.source.js node boq/tests/runtime-regression.cjs
+            BOQ_TEST_REPORT=/tmp/boq-runtime/regression-results.json BOQ_XLSX_PATH=/tmp/boq-runtime/xlsx.full.min.js BOQ_SOURCE_PATH=/tmp/boq-runtime/boq-upload.source.js node boq/tests/runtime-regression.cjs
           fi
       - uses: actions/upload-artifact@v4
         if: always()
