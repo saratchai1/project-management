@@ -1,9 +1,15 @@
 const fs=require('fs');
 const cp=require('child_process');
+const crypto=require('crypto');
+const sha256=s=>crypto.createHash('sha256').update(s).digest('hex');
 const parts=[1,2,3,4].map(i=>fs.readFileSync(`boq/embedded-snapshot-${String(i).padStart(2,'0')}.b64`,'utf8').trim());
 fs.writeFileSync('boq/embedded-snapshot.b64',parts.join(''));
 const external65Parts=[1,2,3,4].map(i=>fs.readFileSync(`boq/external65-master-20260907-${String(i).padStart(2,'0')}.b64`,'utf8').trim());
-fs.writeFileSync('boq/external65-master-20260907.b64',external65Parts.join(''));
+const expectedExternal65PartSha=['fd6b6ddd3a76ce95117ac303bcb68363665cdc8d25663e91ef18934e67ead8fb','ed4b436b6dceb5afd243a12dadbb5a315801d255b4137248ef40374b6b971819','b2dc49ad4bf52fbe87fa6f7f19cbe4d6bc705361517149d4088b76fbc18e8b05','431ec274bc5582bb0c2a38a0027c4aadc0eee8cfba293d721d61195b4020b8d6'];
+external65Parts.forEach((part,i)=>{const actual=sha256(part);if(part.length!==8009||actual!==expectedExternal65PartSha[i])throw new Error(`external65 master part ${i+1} mismatch: len=${part.length} sha256=${actual}`);});
+const external65MasterB64=external65Parts.join('');
+if(external65MasterB64.length!==32036||sha256(external65MasterB64)!=='74f00c5101b7514c84f6461d3710f6f056b8d986fabbb63b830e21834e973681')throw new Error('external65 combined base64 mismatch');
+fs.writeFileSync('boq/external65-master-20260907.b64',external65MasterB64);
 cp.execFileSync(process.execPath,['boq/validate.js'],{stdio:'inherit'});
 cp.execFileSync(process.execPath,['boq/extend-external66.js'],{stdio:'inherit'});
 const patchParts=[1,2,3,4,5].map(i=>fs.readFileSync(`boq/community-contract-view.patch.part${i}`,'utf8'));
