@@ -1,0 +1,42 @@
++        <div class="kpi clickable warn" id="remainingKpi"><div class="label">คงเหลือในสัญญาที่ทำแล้ว</div><div class="value">${money(s.contractBalance)}</div><div class="sub">ไม่รวมชุมชนที่ยังไม่ทำสัญญา</div></div>
++        <div class="kpi clickable" id="uncontractedKpi"><div class="label">ยังไม่ทำสัญญา</div><div class="value">${fmt.format(s.notContracted)} ชุมชน</div><div class="sub">BOQ ประมาณการ ${money(s.uncontractedBoq)}</div></div>
++        <div class="kpi"><div class="label">กองทุนชุมชน (นอก BOQ)</div><div class="value">${money(p.amounts.community_fund)}</div><div class="sub">แยกจากสัญญาปลูก/ดูแล • Clear Advance ${money(p.amounts.field_visit)}</div></div>`;
++      $('remainingKpi').addEventListener('click',openPending);
++      $('uncontractedKpi').addEventListener('click',openUncontracted);
++      return;
+@@ -129,0 +162,13 @@
++    if(state.portfolio==='forest66_community'){
++      const sums=years.map(y=>({year:y,plan:0,contract:0,paid:0,balance:0}));
++      rows.forEach(plot=>sums.forEach(s=>{
++        const r=plot.years[s.year-1]; if(!r)return;
++        s.plan+=Number(r.boq||0);
++        if(r.contractStatus==='ทำสัญญาแล้ว'){s.contract+=Number(r.boq||0);s.paid+=Number(r.paid||0);s.balance+=Number(r.balance||0);}
++      }));
++      $('yearBars').innerHTML=sums.map(r=>{
++        const paidPct=r.contract?Math.min(r.paid/r.contract*100,100):0, remPct=100-paidPct;
++        return `<div class="bar-row"><div class="bar-label">ปี ${r.year}</div><div class="stack-track"><div class="stack-paid" style="width:${paidPct}%" title="จ่ายแล้ว ${money(r.paid)}"></div><div class="stack-remain" style="width:${remPct}%" title="คงเหลือในสัญญา ${money(r.balance)}"></div></div><div class="bar-value">${pct(paidPct)} ของสัญญา · สัญญา ${money(r.contract)} · แผน ${money(r.plan)}</div></div>`;
++      }).join('');
++      return;
++    }
+@@ -152,4 +197,13 @@
+-    if(!available){$('plotUnavailable').textContent='ประเภทโครงการนี้มีข้อมูลจ่ายสะสมตามรหัสโครงการ แต่ยังไม่มี BOQ ป่าบุคคลภายนอก ปี 2566 ในชุดข้อมูลที่ฝังไว้ จึงยังคำนวณคงเหลือรายแปลงไม่ได้';$('tableSubtitle').textContent='';return;}
+-    const rows=filteredPlots(), y=state.year-1; $('boqYearHead').textContent=`BOQ ปี ${state.year}`;
+-    $('tableSubtitle').textContent=`${fmt.format(rows.length)} ${pf.unitLabel} • ปีดำเนินงานที่ ${state.year}`;
+-    $('plotRows').innerHTML=rows.map(p=>{const r=p.years[y],[cls,label]=statusLabel(r);const contract=r?.contractNo||p.contractNo||'';const area=r?.areaRai??p.areaRai;return `<tr><td><strong>${p.projectCode}</strong></td><td>${esc(pf.label)}</td><td>${esc(p.projectName)}</td><td>${esc(p.tokenType||'—')}</td><td>${unitDisplay(p)}${contract?`<div class="muted nowrap">${esc(contract)}</div>`:''}</td><td>${esc(p.province)}</td><td class="num">${fmt.format(area||0)}</td><td class="num">${money(r.boq)}</td><td class="nowrap">${latestLabel(r)}<div class="muted">${r.latestPaymentDate||''}</div></td><td>${pendingLabel(r)}</td><td class="num">${money(r.paid)}</td><td class="num"><strong>${money(r.balance)}</strong></td><td><span class="pill ${cls}">${label}</span></td><td><button class="link-btn" data-plot="${esc(p.plotCode)}">ดู</button></td></tr>`;}).join('');
++    if(!available){$('plotUnavailable').textContent='ประเภทโครงการนี้มีข้อมูลจ่ายสะสมตามรหัสโครงการ แต่ยังไม่มี BOQ ในชุดข้อมูลที่ฝังไว้ จึงยังคำนวณคงเหลือรายแปลงไม่ได้';$('tableSubtitle').textContent='';return;}
++    const rows=filteredPlots(), y=state.year-1, isCommunity=state.portfolio==='forest66_community', s=isCommunity?summary(rows):null;
++    $('boqYearHead').textContent=isCommunity?`BOQ/ประมาณการ ปี ${state.year}`:`BOQ ปี ${state.year}`;
++    $('tableSubtitle').textContent=isCommunity
++      ? `${fmt.format(rows.length)} ชุมชน • ทำสัญญาแล้ว ${fmt.format(s.contracted)} • ยังไม่ทำสัญญา ${fmt.format(s.notContracted)} • ปีดำเนินงานที่ ${state.year}`
++      : `${fmt.format(rows.length)} ${pf.unitLabel} • ปีดำเนินงานที่ ${state.year}`;
++    $('plotRows').innerHTML=rows.map(p=>{
++      const r=p.years[y],[cls,label]=statusLabel(r),contract=r?.contractNo||p.contractNo||'',area=r?.areaRai??p.areaRai;
++      const signed=!isCommunity||r?.contractStatus==='ทำสัญญาแล้ว';
++      const boqCell=isCommunity?`${money(r.boq)}<div class="muted">${signed?'มูลค่าสัญญา':'ประมาณการ — ยังไม่ทำสัญญา'}</div>`:money(r.boq);
++      const paidCell=signed?money(r.paid):'—', balanceCell=signed?`<strong>${money(r.balance)}</strong>`:'—';
++      return `<tr><td><strong>${p.projectCode}</strong></td><td>${esc(pf.label)}</td><td>${esc(p.projectName)}</td><td>${esc(p.tokenType||'—')}</td><td>${unitDisplay(p)}${contract?`<div class="muted nowrap">${esc(contract)}</div>`:''}</td><td>${esc(p.province)}</td><td class="num">${fmt.format(area||0)}</td><td class="num">${boqCell}</td><td class="nowrap">${latestLabel(r)}<div class="muted">${r.latestPaymentDate||''}</div></td><td>${pendingLabel(r)}</td><td class="num">${paidCell}</td><td class="num">${balanceCell}</td><td><span class="pill ${cls}">${label}</span></td><td><button class="link-btn" data-plot="${esc(p.plotCode)}">ดู</button></td></tr>`;
++    }).join('');
+@@ -158 +212 @@
+-  function renderSource(){ $('sourceNote').textContent=`ERP AP ถึง ${D.meta.erpAsOf} • BOQ ป่าบุคคลภายนอก ปี 2565: 160 แปลง • BOQ ป่าชุมชน ปี 2566: 93 ชุมชน ปี 1–2 (ไฟล์ 25.08.2569)`; }
++  function renderSource(){ $('sourceNote').textContent=`ERP AP ถึง ${D.meta.erpAsOf} • BOQ ป่าบุคคลภายนอก ปี 2565: 160 แปลง • BOQ ป่าชุมชน ปี 2566: 93 ชุมชน ปี 1–2 (ไฟล์ 25.08.2569; มูลค่าสัญญานับเฉพาะสถานะ “ทำสัญญาแล้ว”) • BOQ ป่าบุคคลภายนอก ปี 2566: 10 รายการ`; }
+@@ -167,2 +221,13 @@
