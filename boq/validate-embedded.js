@@ -5,6 +5,7 @@ fs.writeFileSync('boq/embedded-snapshot.b64',parts.join(''));
 cp.execFileSync(process.execPath,['boq/validate.js'],{stdio:'inherit'});
 cp.execFileSync(process.execPath,['boq/apply-external65-latest.js'],{stdio:'inherit'});
 cp.execFileSync(process.execPath,['boq/extend-external66.js'],{stdio:'inherit'});
+cp.execFileSync(process.execPath,['boq/apply-erp-20260907.js'],{stdio:'inherit'});
 const patchParts=[1,2,3,4,5].map(i=>fs.readFileSync(`boq/community-contract-view.patch.part${i}`,'utf8'));
 const patchPath='/tmp/community-contract-view.patch';
 fs.writeFileSync(patchPath,patchParts.join(''));
