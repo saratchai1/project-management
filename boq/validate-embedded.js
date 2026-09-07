@@ -1,22 +1,9 @@
 const fs=require('fs');
 const cp=require('child_process');
-const crypto=require('crypto');
-const sha256=s=>crypto.createHash('sha256').update(s).digest('hex');
 const parts=[1,2,3,4].map(i=>fs.readFileSync(`boq/embedded-snapshot-${String(i).padStart(2,'0')}.b64`,'utf8').trim());
 fs.writeFileSync('boq/embedded-snapshot.b64',parts.join(''));
-const p1a=fs.readFileSync('boq/external65-master-20260907-01a.b64','utf8').trim();
-const p1b=fs.readFileSync('boq/external65-master-20260907-01b.b64','utf8').trim();
-const p2a=fs.readFileSync('boq/external65-master-20260907-02a.b64','utf8').trim();
-const p2b=fs.readFileSync('boq/external65-master-20260907-02b.b64','utf8').trim();
-const verifiedChunks=[[p1a,4004,'831bddf0636102c6b2e047ebc0efd62dfcffe8e3157b4adc335d2446c2853601','01a'],[p1b,4005,'a9b709493a0aad5e6f1e238a4394adc750784390cc7e8146c2c84a92c2e8456d','01b'],[p2a,4004,'26dab682f4d955453d5bb535bfcf35647f338185eedc4c46aff097af427a66aa','02a'],[p2b,4005,'a65bcbe975449f7991861128ef651395bca9fde80ae484bf383f4a9ce51ae2f8','02b']];
-for(const [part,len,hash,name] of verifiedChunks){const actual=sha256(part);if(part.length!==len||actual!==hash)throw new Error(`external65 master chunk ${name} mismatch: len=${part.length} sha256=${actual}`);}
-const external65Parts=[p1a+p1b,p2a+p2b,...[3,4].map(i=>fs.readFileSync(`boq/external65-master-20260907-${String(i).padStart(2,'0')}.b64`,'utf8').trim())];
-const expectedExternal65PartSha=['fd6b6ddd3a76ce95117ac303bcb68363665cdc8d25663e91ef18934e67ead8fb','ed4b436b6dceb5afd243a12dadbb5a315801d255b4137248ef40374b6b971819','b2dc49ad4bf52fbe87fa6f7f19cbe4d6bc705361517149d4088b76fbc18e8b05','431ec274bc5582bb0c2a38a0027c4aadc0eee8cfba293d721d61195b4020b8d6'];
-external65Parts.forEach((part,i)=>{const actual=sha256(part);if(part.length!==8009||actual!==expectedExternal65PartSha[i])throw new Error(`external65 master part ${i+1} mismatch: len=${part.length} sha256=${actual}`);});
-const external65MasterB64=external65Parts.join('');
-if(external65MasterB64.length!==32036||sha256(external65MasterB64)!=='74f00c5101b7514c84f6461d3710f6f056b8d986fabbb63b830e21834e973681')throw new Error('external65 combined base64 mismatch');
-fs.writeFileSync('boq/external65-master-20260907.b64',external65MasterB64);
 cp.execFileSync(process.execPath,['boq/validate.js'],{stdio:'inherit'});
+cp.execFileSync(process.execPath,['boq/apply-external65-latest.js'],{stdio:'inherit'});
 cp.execFileSync(process.execPath,['boq/extend-external66.js'],{stdio:'inherit'});
 const patchParts=[1,2,3,4,5].map(i=>fs.readFileSync(`boq/community-contract-view.patch.part${i}`,'utf8'));
 const patchPath='/tmp/community-contract-view.patch';
