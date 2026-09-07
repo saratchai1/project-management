@@ -1,77 +1,86 @@
 const fs=require('fs');
-const vm=require('vm');
-const zlib=require('zlib');
 const https=require('https');
 const cp=require('child_process');
+const zlib=require('zlib');
 const assert=(ok,msg)=>{if(!ok)throw new Error(msg);};
 const clean=v=>v==null?'':String(v).trim();
-const getJson=url=>new Promise((resolve,reject)=>https.get(url,{headers:{'User-Agent':'project-finance-validator'}},res=>{
+const near=(a,b,t=0.05)=>Math.abs(Number(a)-Number(b))<=t;
+const getJson=url=>new Promise((resolve,reject)=>https.get(url,{headers:{'User-Agent':'project-finance-embedded-builder'}},res=>{
   if(res.statusCode>=300&&res.statusCode<400&&res.headers.location){res.resume();return getJson(res.headers.location).then(resolve,reject);}
   if(res.statusCode!==200){res.resume();return reject(new Error(`${url} -> HTTP ${res.statusCode}`));}
   let s='';res.setEncoding('utf8');res.on('data',d=>s+=d);res.on('end',()=>{try{resolve(JSON.parse(s));}catch(e){reject(new Error(`Invalid JSON ${url}: ${e.message}`));}});
 }).on('error',reject));
-
-function recoverClassification(){
-  const sandbox={window:{}};vm.createContext(sandbox);
-  for(const f of ['boq/data-01.js','boq/data-02.js']) vm.runInContext(fs.readFileSync(f,'utf8'),sandbox,{filename:f});
-  const b64=sandbox.window.__FINANCE_B64||'';assert(b64.length>1000,'classification payload missing');
-  const text=zlib.gunzipSync(Buffer.from(b64,'base64'),{finishFlush:zlib.constants.Z_SYNC_FLUSH}).toString('utf8');
-  const marker=',"plots":[';const i=text.indexOf(marker);assert(i>0,'recoverable classification header missing');
-  return JSON.parse(text.slice(0,i)+',"plots":[]}');
-}
-function loadSafeProjectData(){
-  const sandbox={window:{}};vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync('data/project-data.js','utf8'),sandbox,{filename:'data/project-data.js'});
-  for(let i=1;i<=8;i++){const f=`data/plots-${String(i).padStart(2,'0')}.js`;vm.runInContext(fs.readFileSync(f,'utf8'),sandbox,{filename:f});}
-  return sandbox.window.PROJECT_DATA;
-}
 function allocateSequential(boqIns,paid){
   let left=Math.max(0,Number(paid||0));
   return boqIns.map((boq,idx)=>{const b=Number(boq||0);const p=Math.min(b,left);left=Math.max(0,left-p);const remaining=Math.max(0,b-p);return{no:idx+1,boq:b,paid:p,remaining,fullyPaid:remaining<=0.01};});
 }
-
+function makeYear({year,boq,paid=0,boqIns=[],statusOverride=null,contractNo=null,areaRai=0,contractStatus='ทำสัญญาแล้ว',template='',paymentDataAvailable=true}){
+  const paidCapped=Math.min(Math.max(0,Number(paid||0)),Number(boq||0));
+  const balance=Math.max(0,Number(boq||0)-paidCapped);
+  const installments=allocateSequential(boqIns,paidCapped);
+  const latestFull=Math.max(0,...installments.filter(x=>x.fullyPaid).map(x=>x.no));
+  const pending=statusOverride==='not_contracted'||statusOverride==='future'?[]:installments.filter(x=>x.remaining>0.01).map(x=>x.no);
+  let status=statusOverride;
+  if(!status) status=balance<=0.01?'paid':paidCapped>0?'partial':'not_started';
+  return {year,boq:Number(boq||0),paid:paidCapped,possiblePaid:paidCapped,balance,possibleBalance:balance,over:0,status,paymentDataAvailable,paymentConfidence:paymentDataAvailable?'embedded_erp_ap':'no_data',latestPaymentInstallments:[],latestFullInstallment:latestFull,latestPaymentDate:null,latestPaymentAmount:null,pendingInstallments:pending,installments,template,exception:false,contractNo,areaRai,contractStatus};
+}
 (async()=>{
   for(const f of ['boq/data.js','boq/app.js']) cp.execFileSync(process.execPath,['--check',f],{stdio:'inherit'});
-  const base=recoverClassification();
-  const safe=loadSafeProjectData();
-  assert(safe.plots.length===151,`safe ERP/Progress snapshot expected 151 plots, got ${safe.plots.length}`);
-  const safeByKey=new Map(safe.plots.map(p=>[`${clean(p.plotId)}|${clean(p.contractNo)}`,p]));
-  const safeByPlot=new Map(safe.plots.map(p=>[clean(p.plotId),p]));
-
+  const snap=JSON.parse(zlib.gunzipSync(Buffer.from(fs.readFileSync('boq/embedded-snapshot.b64','utf8').trim(),'base64')).toString('utf8'));
   const ROOT='https://raw.githubusercontent.com/saratchai1/project-management/a397f7713be0292d3e14cc3f495ff13ed77a4717/data/boq-2565-tc-rok-20260827/';
   const manifest=await getJson(ROOT+'manifest.json');
   const parts=await Promise.all(manifest.parts.map(f=>getJson(ROOT+f)));
   const d=manifest.dictionaries;
   const template=y=>(manifest.year_templates[String(y)]||[]).map(x=>`${Math.round(x*100)}%`).join('/');
-  const plots=parts.flatMap(x=>x.plots).map(r=>{
-    const company=clean(d.company[r[4]]);const plotCode=clean(r[1]);const contractNo=clean(r[12]);
+  const y2Unpaid=new Set(snap.external65.y2Unpaid);
+  const external=parts.flatMap(x=>x.plots).map(r=>{
+    const company=clean(d.company[r[4]]),plotCode=clean(r[1]),contractNo=clean(r[12]);
     const projectCode=company==='STC'?'TCGMCR6508':'TCGMCR6607';
-    const safePlot=safeByKey.get(`${plotCode}|${contractNo}`)||safeByPlot.get(plotCode)||null;
     const years=r[14].map(y=>{
-      const year=Number(y[0]);const boq=Number(y[1]||0);const boqIns=y.slice(2,6).map(v=>Number(v||0)).filter((v,idx)=>idx<3||v!==0||year!==1);
-      if(year!==3){return{year,boq,paid:0,possiblePaid:0,balance:boq,possibleBalance:boq,over:0,status:'no_data',paymentDataAvailable:false,paymentConfidence:'no_data',latestPaymentInstallments:[],latestFullInstallment:0,latestPaymentDate:null,latestPaymentAmount:null,pendingInstallments:[],installments:boqIns.map((b,i)=>({no:i+1,boq:b,paid:0,remaining:b,fullyPaid:false})),template:template(year),exception:!!y[6]};}
-      const pay=safePlot?.payment||null;const confirmed=Number(pay?.confirmedAmount||0);const ambiguous=Number(pay?.ambiguousAmount||0);const possible=confirmed+ambiguous;
-      const installments=allocateSequential(boqIns,confirmed);const latestFull=Math.max(0,...installments.filter(x=>x.fullyPaid).map(x=>x.no));
-      const pending=installments.filter(x=>x.remaining>0.01).map(x=>x.no);const over=Math.max(0,confirmed-boq);const balance=Math.max(0,boq-confirmed);
-      return{year,boq,paid:confirmed,possiblePaid:possible,balance,possibleBalance:Math.max(0,boq-possible),over,status:confirmed>=boq-0.01?'paid':confirmed>0?'partial':safePlot?'not_started':'no_data',paymentDataAvailable:!!safePlot,paymentConfidence:pay?.confidence||'no_data',latestPaymentInstallments:[],latestFullInstallment:latestFull,latestPaymentDate:pay?.lastDate||null,latestPaymentAmount:null,pendingInstallments:pending,installments,template:template(year),exception:!!y[6],installmentInference:true};
+      const year=Number(y[0]),boq=Number(y[1]||0);
+      const boqIns=y.slice(2,6).map(v=>Number(v||0)).filter((v,idx)=>idx<3||v!==0||year!==1);
+      let paid=0,statusOverride=null,paymentDataAvailable=true;
+      if(year===1) paid=Object.prototype.hasOwnProperty.call(snap.external65.y1Partial,plotCode)?Number(snap.external65.y1Partial[plotCode]):boq;
+      else if(year===2) paid=y2Unpaid.has(plotCode)?0:boq;
+      else if(year===3) paid=Number(snap.external65.y3Paid[plotCode]||0);
+      else {statusOverride='future';paymentDataAvailable=false;}
+      return makeYear({year,boq,paid,boqIns,statusOverride,contractNo,areaRai:Number(r[11]||0),template:template(year),paymentDataAvailable});
     });
-    return{projectCode,plotCode,contractNo,projectName:clean(d.project_name[r[2]]),tokenType:clean(d.token_type[r[3]]),company,moo:clean(d.moo[r[5]]),village:clean(d.village[r[6]]),subdistrict:clean(d.subdistrict[r[7]]),district:clean(d.district[r[8]]),province:clean(d.province[r[9]]),areaType:clean(d.area_type[r[10]]),areaRai:Number(r[11]||0),total10y:Number(r[13]||0),years};
+    return {portfolio:'forest65_external',projectCode,plotCode,contractNo,projectName:clean(d.project_name[r[2]]),tokenType:clean(d.token_type[r[3]]),company,moo:clean(d.moo[r[5]]),village:clean(d.village[r[6]]),subdistrict:clean(d.subdistrict[r[7]]),district:clean(d.district[r[8]]),province:clean(d.province[r[9]]),areaType:clean(d.area_type[r[10]]),areaRai:Number(r[11]||0),total10y:Number(r[13]||0),years};
   });
-  plots.sort((a,b)=>a.plotCode.localeCompare(b.plotCode,'th',{numeric:true}));
-  const boqTotal=plots.reduce((s,p)=>s+p.years.reduce((a,y)=>a+y.boq,0),0);
-  assert(plots.length===160,`expected 160 BOQ master plots, got ${plots.length}`);
-  assert(Math.abs(boqTotal-Number(manifest.ten_year_total_baht))<0.02,'BOQ master does not reconcile');
-  assert(plots.every(p=>p.projectCode&&p.plotCode&&p.contractNo&&p.years.length===10),'plot key/year structure incomplete');
-  const mappedYear3=plots.filter(p=>p.years[2].paymentDataAvailable).length;
-  const year3Confirmed=plots.reduce((s,p)=>s+p.years[2].paid,0);
-  const totalExternalBoqAp=Number(base.portfolios.find(p=>p.id==='forest65_external')?.amounts?.boq_contract||0);
-  const mappedBoqPayments=Number(base.meta.mappedBoqPayments||0);
-  const data={
-    meta:{...base.meta,boq10y:Number(manifest.ten_year_total_baht),areaRai:Number(manifest.total_area_rai),plotCount:plots.length,mappedYear3Plots:mappedYear3,year3ConfirmedPublicSnapshot:year3Confirmed,unmatchedOrOutOfMasterBoqPayment:Math.max(0,totalExternalBoqAp-mappedBoqPayments),paymentScope:'ระดับแปลงใช้ public safe ERP snapshot เฉพาะปีที่ 3; ปีอื่นแสดงยอด BOQ รายแปลงและยอดจ่ายรวมระดับ portfolio เท่านั้น'},
-    portfolios:base.portfolios,projectCodes:base.projectCodes,workTypeLabels:base.workTypeLabels,yearSummary:base.yearSummary,plots
-  };
+  external.sort((a,b)=>a.plotCode.localeCompare(b.plotCode,'th',{numeric:true}));
+  assert(external.length===160,`expected 160 external plots, got ${external.length}`);
+  const community=snap.community66.map(row=>{
+    const [plotCode,communityName,chairman,province,area1,contract1,status1,boq1,area2,contract2,status2,boq2,paid1]=row;
+    const ins1=[.3,.2,.3,.2].map(x=>Number((boq1*x).toFixed(2))),ins2=[.3,.2,.3,.2].map(x=>Number((boq2*x).toFixed(2)));
+    ins1[3]=Number((boq1-ins1[0]-ins1[1]-ins1[2]).toFixed(2));ins2[3]=Number((boq2-ins2[0]-ins2[1]-ins2[2]).toFixed(2));
+    const contracted1=status1==='ทำสัญญาแล้ว',contracted2=status2==='ทำสัญญาแล้ว';
+    const y1=makeYear({year:1,boq:boq1,paid:paid1,boqIns:ins1,statusOverride:contracted1?null:'not_contracted',contractNo:contract1,areaRai:area1,contractStatus:status1,template:'30%/20%/30%/20%',paymentDataAvailable:contracted1});
+    const y2=makeYear({year:2,boq:boq2,paid:0,boqIns:ins2,statusOverride:contracted2?null:'not_contracted',contractNo:contract2,areaRai:area2,contractStatus:status2,template:'30%/20%/30%/20%',paymentDataAvailable:contracted2});
+    return {portfolio:'forest66_community',projectCode:'TCGMCR6609',plotCode,contractNo:contract1||contract2||'',projectName:'โครงการปลูกป่าชายเลน เพื่อประโยชน์จากคาร์บอนเครดิต สำหรับชุมชน ประจำปี พ.ศ. 2566',tokenType:'',company:'ชุมชน',moo:'',village:communityName,subdistrict:'',district:'',province,areaType:'ป่าชุมชน',areaRai:Number(area1||area2||0),total10y:Number(boq1||0)+Number(boq2||0),communityName,chairman,years:[y1,y2]};
+  });
+  assert(community.length===93,`expected 93 community units, got ${community.length}`);
+  const plots=[...external,...community];
+  const portfolios=snap.portfolios.map(p=>({...p}));
+  const meta={...snap.meta,classificationPolicy:'ยอดจ่าย BOQ ใช้ ERP module AP เฉพาะงานปลูก/บำรุง; กองทุนชุมชน/PDD/VVB/Clear Advance แยกหมวดและไม่หักจาก BOQ',external65PlotCount:160,community66UnitCount:93,totalPlotLikeUnits:253,publicDataPolicy:'Aggregated project/plot/community/payment status; raw voucher IDs and remarks excluded.'};
+  const data={meta,portfolios,projectCodes:snap.projectCodes,workTypeLabels:snap.workTypeLabels,plots};
   fs.writeFileSync('boq/finance-data.json',JSON.stringify(data));
-  const check=JSON.parse(fs.readFileSync('boq/finance-data.json','utf8'));
-  assert(check.plots.length===160&&check.projectCodes.length===5,'generated finance-data.json invalid');
-  console.log(JSON.stringify({ok:true,plots:plots.length,mappedYear3,year3Confirmed:Number(year3Confirmed.toFixed(2)),boqTotal:Number(boqTotal.toFixed(2)),projectCodes:base.projectCodes.length,output:'boq/finance-data.json'}));
+  const sum=(rows,y,k)=>rows.reduce((s,p)=>s+Number(p.years[y-1]?.[k]||0),0);
+  const e1={boq:sum(external,1,'boq'),paid:sum(external,1,'paid'),balance:sum(external,1,'balance')};
+  const e2={boq:sum(external,2,'boq'),paid:sum(external,2,'paid'),balance:sum(external,2,'balance')};
+  const e3={boq:sum(external,3,'boq'),paid:sum(external,3,'paid'),balance:sum(external,3,'balance')};
+  const c1={boq:sum(community,1,'boq'),paid:sum(community,1,'paid')},c2={boq:sum(community,2,'boq'),paid:sum(community,2,'paid')};
+  assert(near(e1.boq,169802286.35)&&near(e1.paid,167675542.17)&&near(e1.balance,2126744.18),'external65 year1 mismatch');
+  assert(near(e2.boq,56786944.69)&&near(e2.paid,54508982.24)&&near(e2.balance,2277962.45),'external65 year2 mismatch');
+  assert(external.filter(p=>p.years[1].paid<=0.01).length===9,'external65 year2 unpaid count mismatch');
+  assert(near(e3.paid,7013632.96),'external65 year3 paid mismatch');
+  assert(near(c1.boq,69677122.05)&&near(c1.paid,4116627),'community year1 mismatch');
+  assert(near(c2.boq,30967343.80)&&near(c2.paid,0),'community year2 mismatch');
+  assert(near(c1.boq+c2.boq,100644465.85),'community combined BOQ mismatch');
+  const pm=Object.fromEntries(portfolios.map(p=>[p.id,p]));
+  assert(near(pm.forest66_community.amounts.boq_contract,4116627)&&near(pm.forest66_community.amounts.community_fund,18600000),'community AP categories mismatch');
+  assert(near(pm.forest66_community.amounts.field_visit,365773.65),'community advance/field visit mismatch');
+  assert(near(pm.forest66_external.amounts.boq_contract,3673921)&&near(pm.forest66_external.totalAp,3992126.10),'external66 AP mismatch');
+  for(const p of portfolios){const cat=Object.values(p.amounts).reduce((a,b)=>a+Number(b||0),0);assert(near(cat,p.totalAp,0.1),`${p.id} AP categories do not reconcile`);}
+  console.log(JSON.stringify({ok:true,units:plots.length,external65:{year1:e1,year2:{...e2,unpaidPlots:9},year3:e3},community66:{year1:c1,year2:c2,combinedBoq:c1.boq+c2.boq,fund:pm.forest66_community.amounts.community_fund,advance:pm.forest66_community.amounts.field_visit},external66:{boqTypeAp:pm.forest66_external.amounts.boq_contract,totalAp:pm.forest66_external.totalAp},output:'boq/finance-data.json'}));
 })().catch(err=>{console.error(err);process.exit(1);});
