@@ -15,6 +15,7 @@
     })();
   </script>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="monitor-work.css">
   <style>
     html.embedded .hero{display:none}
     html.embedded main{max-width:none;padding:14px 16px 48px}
@@ -87,6 +88,7 @@
       <nav class="view-nav card" aria-label="มุมมอง Dashboard">
         <button class="view-btn active" data-view="overview">ภาพรวม</button>
         <button class="view-btn" data-view="tracking">ติดตามงาน</button>
+        <button class="view-btn" data-view="monitor-work">Monitor งาน</button>
       </nav>
 
       <div id="overviewContent" class="view-content active">
@@ -116,6 +118,59 @@
           <div class="table-wrap"><table><thead><tr><th>แปลง</th><th>จังหวัด</th><th>ระดับติดตาม</th><th>Plan</th><th>Progress</th><th>Gap</th><th>ช้า</th><th>จุดติดขัดล่าสุด</th><th>แหล่งข้อมูล</th></tr></thead><tbody id="plotRows"></tbody></table></div>
         </section>
       </div>
+
+      <div id="monitorWorkContent" class="view-content">
+        <section class="card mw-intro">
+          <div>
+            <span class="file-label">MONITOR งาน · ตามแบบ Excel</span>
+            <h2>ภาพรวมสถานะงาน / ส่งมอบ / ตรวจรับ รายแปลง</h2>
+            <p>อ่านจาก Sheet ปีงานใน Excel ที่เพิ่มไว้ในโครงการเดียวกัน และรวมเป็นตาราง Monitor งานโดยไม่แก้ข้อมูลต้นฉบับ</p>
+          </div>
+          <div class="mw-rulebox">
+            <div class="mw-rule"><b>ROK ส่งมอบงาน</b><span>อ่านแถวที่มีคำว่า “ส่งมอบ” และ Progress ตั้งแต่ 80% ขึ้นไป</span></div>
+            <div class="mw-rule"><b>TC ตรวจรับมอบงาน</b><span>อ่านแถวที่มีคำว่า “ส่งมอบ” และ Progress = 100%</span></div>
+          </div>
+        </section>
+
+        <section class="mw-kpis" id="mwKpis"></section>
+
+        <section class="card mw-filters">
+          <div class="field"><label for="mwSearch">ค้นหา</label><input id="mwSearch" type="search" placeholder="รหัสแปลง / จังหวัด / TOKEN..."></div>
+          <div class="field"><label for="mwYear">ปีดำเนินงาน</label><select id="mwYear"><option value="">ทุกปีงาน</option></select></div>
+          <div class="field"><label for="mwProjectType">ประเภทโครงการ</label><select id="mwProjectType"><option value="">ทุกประเภทโครงการ</option></select></div>
+          <div class="field"><label for="mwToken">ประเภท TOKEN X</label><select id="mwToken"><option value="">ทุก TOKEN</option></select></div>
+          <div class="field"><label for="mwProvince">จังหวัด</label><select id="mwProvince"><option value="">ทุกจังหวัด</option></select></div>
+          <label class="mw-check"><input id="mwDelayedOnly" type="checkbox"> เฉพาะมีงวดล่าช้า</label>
+          <button class="btn ghost" id="mwReset" type="button">ล้างตัวกรอง</button>
+        </section>
+
+        <div id="mwWarnings" class="mw-warning" hidden></div>
+
+        <section class="card table-card mw-table-card">
+          <div class="table-head"><div><h2>Monitor งาน</h2><p id="mwMeta"></p></div><button class="btn" id="mwExport" type="button">Export CSV</button></div>
+          <div class="mw-table-wrap">
+            <table class="mw-table">
+              <thead><tr>
+                <th>ประเภทโครงการ</th>
+                <th>ชื่อโครงการ T-VER</th>
+                <th>ประเภท TOKEN X</th>
+                <th>รหัสแปลง</th>
+                <th>จังหวัด</th>
+                <th>เนื้อที่สัญญา (ไร่)</th>
+                <th>การดำเนินงานปีที่ ...</th>
+                <th>ดำเนินงานเสร็จ<br>ถึงงวดที่ ...</th>
+                <th>งวดงานที่ล่าช้า<br>อิงตามแผนงาน</th>
+                <th>ROK ส่งมอบงาน<br>ถึงงวดที่ ...</th>
+                <th>TC ตรวจรับมอบงาน<br>ถึงงวดที่ ...</th>
+                <th>แหล่งข้อมูล</th>
+              </tr></thead>
+              <tbody id="mwRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="mw-footnote"><b>กติกา:</b> “ดำเนินงานเสร็จถึงงวดที่” ใช้กิจกรรมในงวดนั้นครบ 100% โดยไม่นับแถวส่งมอบ · “งวดงานที่ล่าช้า” แสดงทุกงวดที่ Status เป็น O หรือ D จึงสามารถมีมากกว่า 1 งวดได้ · ROK/TC อ่านเฉพาะแถวที่มีคำว่า “ส่งมอบ” ตามเกณฑ์ 80% / 100% ด้านบน</section>
+      </div>
     </div>
   </main>
 
@@ -125,6 +180,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="../work-monitor-upload/excel-parser.js"></script>
   <script src="app.js"></script>
+  <script src="monitor-work.js"></script>
   <script src="file-bridge.js"></script>
 </body>
 </html>
