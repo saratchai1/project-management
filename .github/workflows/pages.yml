@@ -33,6 +33,9 @@ jobs:
           node --check work-monitor-upload/app.js
           node --check work-monitor-upload/excel-parser.js
           node --check work-monitor-multifile/app.js
+          node --check work-monitor-multifile/monitor-work.js
+          grep -q 'monitor-work.js' work-monitor-multifile/dashboard.html
+          grep -q 'monitor-work.css' work-monitor-multifile/dashboard.html
       - name: Validate Carbon Token Gantt (Huay-Kha-Kaeng style)
         run: |
           node --check carbon-token-gantt/hkk.js
