@@ -46,7 +46,7 @@
         <strong>เลือก Excel หลายไฟล์ หรือลากมาวาง</strong>
         <small>.xlsx / .xls / .xlsm / .xlsb</small>
       </label>
-      <div class="privacy-note"><b>ไฟล์อยู่บนเครื่องผู้ใช้</b> — browser อ่านข้อมูล locally และไม่ส่ง Excel ขึ้น GitHub/server</div>
+      <div class="privacy-note"><b>ไฟล์อยู่บนเครื่องผู้ใช้</b> — browser อ่านและเก็บ Excel locally เพื่อให้กลับมาหลัง Refresh ได้ และไม่ส่งขึ้น GitHub/server</div>
     </section>
 
     <section class="error-card card" id="errorCard" hidden></section>
@@ -147,7 +147,7 @@
         <div id="mwWarnings" class="mw-warning" hidden></div>
 
         <section class="card table-card mw-table-card">
-          <div class="table-head"><div><h2>Monitor งาน</h2><p id="mwMeta"></p></div><button class="btn" id="mwExport" type="button">Export CSV</button></div>
+          <div class="table-head"><div><h2>Monitor งาน</h2><p id="mwMeta"></p></div><button class="btn" id="mwExport" type="button">Export Report (.xlsx)</button></div>
           <div class="mw-table-wrap">
             <table class="mw-table">
               <thead><tr>
@@ -181,6 +181,7 @@
   <script src="../work-monitor-upload/excel-parser.js"></script>
   <script src="app.js"></script>
   <script src="monitor-work.js"></script>
+  <script src="file-persistence.js"></script>
   <script src="file-bridge.js"></script>
 </body>
 </html>
