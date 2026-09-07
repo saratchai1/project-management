@@ -229,11 +229,26 @@ function resetFilters(){
   M.filters={q:'',year:'',projectType:'',token:'',province:'',delayed:false};
   ['mwSearch','mwYear','mwProjectType','mwToken','mwProvince'].forEach(id=>{if($(id))$(id).value=''});if($('mwDelayedOnly'))$('mwDelayedOnly').checked=false;render();
 }
-function csv(){
-  const h=['ประเภทโครงการ','ชื่อโครงการ T-VER','ประเภท TOKEN X','รหัสแปลง','จังหวัด','เนื้อที่สัญญา (ไร่)','การดำเนินงานปีที่','ดำเนินงานเสร็จถึงงวดที่','งวดงานที่ล่าช้า','ROK ส่งมอบงานถึงงวดที่','TC ตรวจรับมอบงานถึงงวดที่','Source file'];
-  const data=filteredRows().map(r=>[r.projectType,projectName(),r.token,r.id,r.province,r.area,r.year,r.workThrough||'',r.delayed.join(','),r.rok.join(','),r.tc.join(','),r.sourceFile]);
-  const out=[h,...data].map(row=>row.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['\ufeff'+out],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`monitor-work-${PROJECT_ID}.csv`;a.click();URL.revokeObjectURL(a.href);
+function exportReport(){
+  if(!window.XLSX){alert('ตัวส่งออก Excel ยังไม่พร้อม กรุณา Refresh แล้วลองใหม่');return}
+  const rows=[...filteredRows()].sort((a,b)=>Number(a.year)-Number(b.year)||natural(a.id,b.id));
+  const notes=['','','','','','','','','','อ่านค่า 80 % ตรงคำว่าส่งมอบแต่ละงวด','อ่านค่า 100 % ตรงคำว่าส่งมอบแต่ละงวด'];
+  const headers=[
+    'ประเภทโครงการ','ชื่อโครงการ T-VER','ประเภท TOKEN X','รหัสแปลง','จังหวัด','เนื้อที่สัญญา (ไร่)','การดำเนินงานปีที่ ...',
+    'ดำเนินงานเสร็จ\nถึงงวดที่ .......','งวดงานที่ล่าช้า\nอิงตามแผนงาน','ROK ส่งมอบงาน\nถึงงวดที่.....','TC ตรวจรับมอบงาน\nถึงงวดที่.....'
+  ];
+  const data=rows.map(r=>[
+    r.projectType||'',projectName(),r.token||'',r.id,r.province,r.area||'',Number(r.year)||r.year,r.workThrough||'',r.delayed.join(','),r.rok.join(','),r.tc.join(',')
+  ]);
+  const ws=XLSX.utils.aoa_to_sheet([notes,headers,...data]);
+  ws['!cols']=[{wch:55},{wch:34},{wch:18},{wch:15},{wch:14},{wch:18},{wch:20},{wch:22},{wch:22},{wch:24},{wch:26}];
+  ws['!rows']=[{hpt:24},{hpt:42}];
+  ws['!autofilter']={ref:`A2:K${Math.max(2,data.length+2)}`};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Monitor งาน');
+  const safe=projectName().replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim().slice(0,80)||PROJECT_ID;
+  const date=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,`Monitor งาน - ${safe} - ${date}.xlsx`,{bookType:'xlsx'});
 }
 function syncView(){const btn=document.querySelector('.view-btn[data-view="monitor-work"]'),content=$('monitorWorkContent');if(!btn||!content)return;const active=btn.classList.contains('active');content.classList.toggle('active',active);document.querySelector('.filters')?.classList.toggle('mw-hidden',active);$('yearNav')?.classList.toggle('mw-hidden',active);if(active)render()}
 function bind(){
@@ -248,7 +263,7 @@ function bind(){
   const link=(id,key,event='change')=>$(id)?.addEventListener(event,e=>{M.filters[key]=event==='input'?e.target.value:e.target.value;render()});
   link('mwSearch','q','input');link('mwYear','year');link('mwProjectType','projectType');link('mwToken','token');link('mwProvince','province');
   $('mwDelayedOnly')?.addEventListener('change',e=>{M.filters.delayed=e.target.checked;render()});
-  $('mwReset')?.addEventListener('click',resetFilters);$('mwExport')?.addEventListener('click',csv);
+  $('mwReset')?.addEventListener('click',resetFilters);$('mwExport')?.addEventListener('click',exportReport);
   syncView();render();
 }
 bind();
