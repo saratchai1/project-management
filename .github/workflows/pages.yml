@@ -27,7 +27,7 @@ jobs:
       - name: Validate work monitor data
         run: node work-monitor/validate.js
       - name: Validate project finance data
-        run: node boq/validate.js
+        run: node boq/validate-embedded.js
       - name: Validate reusable upload apps
         run: |
           node --check work-monitor-upload/app.js
