@@ -69,7 +69,7 @@
     </section>
 
     <section class="session-note">
-      <b>การเก็บข้อมูล:</b> รายชื่อโครงการถูกจำไว้ใน browser เครื่องนี้ ส่วน Excel และเอกสารแนบอยู่ในหน่วยความจำของแท็บปัจจุบันเท่านั้น ไฟล์ไม่ถูกส่งขึ้น GitHub/server และจะหายเมื่อ Refresh หรือปิดแท็บ
+      <b>การเก็บข้อมูล:</b> รายชื่อโครงการและ Excel ที่เพิ่มในแต่ละโครงการถูกเก็บไว้ใน browser เครื่องนี้ จึงสามารถกลับมาหลัง Refresh ได้ โดยไฟล์ไม่ถูกส่งขึ้น GitHub/server ส่วนเอกสารแนบทั่วไปยังอยู่เฉพาะแท็บปัจจุบัน
     </section>
   </main>
 
@@ -110,5 +110,6 @@
   <input id="projectAttachmentInput" type="file" multiple hidden>
 
   <script src="project-shell.js"></script>
+  <script src="refresh-restore.js"></script>
 </body>
 </html>
