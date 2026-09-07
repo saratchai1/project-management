@@ -1,0 +1,65 @@
+--- boq/app.js	2026-09-07 05:07:30.590039420 +0000
++++ boq/app.js	2026-09-07 05:07:30.597988816 +0000
+@@ -66 +66,2 @@
+-    rows.sort((a,b)=>state.sort==='plot'?a.plotCode.localeCompare(b.plotCode,'th',{numeric:true}):state.sort==='paid'?b.years[y].paid-a.years[y].paid:state.sort==='boq'?b.years[y].boq-a.years[y].boq:b.years[y].balance-a.years[y].balance);
++    const balanceOf=x=>state.portfolio==='forest66_community'&&x.years[y]?.contractStatus!=='ทำสัญญาแล้ว'?-1:Number(x.years[y]?.balance||0);
++    rows.sort((a,b)=>state.sort==='plot'?a.plotCode.localeCompare(b.plotCode,'th',{numeric:true}):state.sort==='paid'?Number(b.years[y]?.paid||0)-Number(a.years[y]?.paid||0):state.sort==='boq'?Number(b.years[y]?.boq||0)-Number(a.years[y]?.boq||0):balanceOf(b)-balanceOf(a));
+@@ -70,3 +71,17 @@
+-    const y=state.year-1; const s={boq:0,paid:0,balance:0,over:0,pending:0,started:0,notContracted:0,contracted:0};
+-    rows.forEach(p=>{const r=p.years[y]; if(!r)return; s.boq+=r.boq;s.paid+=r.paid;s.balance+=r.balance;s.over+=r.over||0;if(r.paid>1)s.started++;if(r.contractStatus==='ทำสัญญาแล้ว')s.contracted++;if(r.status==='not_contracted')s.notContracted++;if(r.balance>1&&r.contractStatus==='ทำสัญญาแล้ว')s.pending++;});
+-    s.rate=s.boq?Math.min(s.paid/s.boq*100,999):0; return s;
++    const y=state.year-1;
++    const s={boq:0,paid:0,balance:0,over:0,pending:0,started:0,notContracted:0,contracted:0,contractBoq:0,contractPaid:0,contractBalance:0,uncontractedBoq:0};
++    rows.forEach(p=>{
++      const r=p.years[y]; if(!r)return;
++      s.boq+=Number(r.boq||0); s.paid+=Number(r.paid||0); s.balance+=Number(r.balance||0); s.over+=Number(r.over||0);
++      if(r.paid>1)s.started++;
++      if(r.contractStatus==='ทำสัญญาแล้ว'){
++        s.contracted++; s.contractBoq+=Number(r.boq||0); s.contractPaid+=Number(r.paid||0); s.contractBalance+=Number(r.balance||0);
++        if(r.balance>1)s.pending++;
++      } else if(r.status==='not_contracted'){
++        s.notContracted++; s.uncontractedBoq+=Number(r.boq||0);
++      }
++    });
++    s.rate=state.portfolio==='forest66_community'
++      ? (s.contractBoq?Math.min(s.contractPaid/s.contractBoq*100,999):0)
++      : (s.boq?Math.min(s.paid/s.boq*100,999):0);
++    return s;
+@@ -75,4 +90,13 @@
+-    const rows=portfolioPlots(portfolio.id); const years=portfolio.boqYears||[];
+-    let boq=0,paid=0;
+-    rows.forEach(p=>years.forEach(y=>{const r=p.years[y-1];if(r){boq+=r.boq;paid+=r.paid;}}));
+-    return {boq,paid,balance:Math.max(0,boq-paid),rate:boq?Math.min(paid/boq*100,100):0};
++    const rows=portfolioPlots(portfolio.id), years=portfolio.boqYears||[];
++    const s={boq:0,paid:0,balance:0,contractBoq:0,contractPaid:0,contractBalance:0,uncontractedBoq:0};
++    rows.forEach(p=>years.forEach(y=>{
++      const r=p.years[y-1]; if(!r)return;
++      s.boq+=Number(r.boq||0); s.paid+=Number(r.paid||0); s.balance+=Number(r.balance||0);
++      if(r.contractStatus==='ทำสัญญาแล้ว'){
++        s.contractBoq+=Number(r.boq||0); s.contractPaid+=Number(r.paid||0); s.contractBalance+=Number(r.balance||0);
++      } else if(r.status==='not_contracted') s.uncontractedBoq+=Number(r.boq||0);
++    }));
++    s.rate=portfolio.id==='forest66_community'
++      ? (s.contractBoq?Math.min(s.contractPaid/s.contractBoq*100,100):0)
++      : (s.boq?Math.min(s.paid/s.boq*100,100):0);
++    return s;
+@@ -89 +113,7 @@
+-        detail=active?`ปี ${state.year}: BOQ ${money(s.boq)} • คงเหลือ ${money(s.balance)}`:`${p.boqScopeLabel||'BOQ'} ${money(s.boq)} • จ่ายตาม BOQ ${money(s.paid)}`;
++        if(p.id==='forest66_community'){
++          detail=active
++            ? `ปี ${state.year}: สัญญาแล้ว ${money(s.contractBoq)} • จ่าย ${money(s.contractPaid)} • BOQ แผน ${money(s.boq)}`
++            : `BOQ แผนปี 1–2 ${money(s.boq)} • สัญญาแล้ว ${money(s.contractBoq)} • จ่าย ${money(s.contractPaid)}`;
++        }else{
++          detail=active?`ปี ${state.year}: BOQ ${money(s.boq)} • คงเหลือ ${money(s.balance)}`:`${p.boqScopeLabel||'BOQ'} ${money(s.boq)} • จ่ายตาม BOQ ${money(s.paid)}`;
++        }
+@@ -110,7 +140,9 @@
+-        <div class="kpi"><div class="label">BOQ ปลูก/ดูแล ปี ${state.year}</div><div class="value">${money(s.boq)}</div><div class="sub">${fmt.format(rows.length)} ชุมชน</div></div>
+-        <div class="kpi"><div class="label">จ่ายค่าปลูก/ดูแล (ERP AP)</div><div class="value">${money(s.paid)}</div><div class="sub">${pct(s.rate)} ของ BOQ • ERP ถึง ${D.meta.erpAsOf}</div></div>
+-        <div class="kpi clickable warn" id="remainingKpi"><div class="label">BOQ คงเหลือ</div><div class="value">${money(s.balance)}</div><div class="sub">รวมชุมชนที่ยังไม่ทำสัญญาด้วย</div></div>
+-        <div class="kpi"><div class="label">ทำสัญญาแล้ว</div><div class="value">${fmt.format(s.contracted)} ชุมชน</div><div class="sub">ยังไม่ทำสัญญา ${fmt.format(s.notContracted)} ชุมชน</div></div>
+-        <div class="kpi"><div class="label">กองทุนชุมชน (นอก BOQ)</div><div class="value">${money(p.amounts.community_fund)}</div><div class="sub">แยก ไม่หักจาก BOQ ปลูก/ดูแล</div></div>
+-        <div class="kpi"><div class="label">ลงพื้นที่ / Clear Advance</div><div class="value">${money(p.amounts.field_visit)}</div><div class="sub">ค่าใช้จ่ายประกอบ แยกจาก BOQ</div></div>`;
+-      $('remainingKpi').addEventListener('click',openPending); return;
++        <div class="kpi"><div class="label">BOQ ตามแผน ปี ${state.year}</div><div class="value">${money(s.boq)}</div><div class="sub">${fmt.format(rows.length)} ชุมชน • รวมทั้งที่ยังไม่ทำสัญญา</div></div>
++        <div class="kpi"><div class="label">มูลค่าสัญญาที่ทำแล้ว</div><div class="value">${money(s.contractBoq)}</div><div class="sub">${fmt.format(s.contracted)} ชุมชน ตามสถานะในไฟล์ BOQ</div></div>
++        <div class="kpi"><div class="label">จ่ายค่าปลูก/ดูแล (ERP AP)</div><div class="value">${money(s.contractPaid)}</div><div class="sub">${pct(s.rate)} ของสัญญาที่ทำแล้ว • ERP ถึง ${D.meta.erpAsOf}</div></div>
