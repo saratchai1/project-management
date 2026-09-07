@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b3b35">
   <title>Project Finance Control | Forest Project</title>
-  <meta name="description" content="ติดตาม BOQ ยอดจ่ายและคงเหลือ โดยเริ่มจากรหัสโครงการและเจาะลงถึงรายแปลง">
+  <meta name="description" content="ติดตาม BOQ ยอดจ่ายและคงเหลือของป่าบุคคลภายนอกและป่าชุมชน จากชุดข้อมูล Excel ที่ตรวจและฝังไว้ในแอป">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -24,7 +24,7 @@
 
   <main class="shell">
     <section class="notice">
-      <div><strong>หลักการจับข้อมูลใหม่</strong><span>เริ่มจากรหัสโครงการ แล้ว Tag ประเภทงาน ก่อนผูกกับรหัสแปลงและเลขสัญญา</span></div>
+      <div><strong>ฐาน BOQ ที่ใช้ใน Dashboard</strong><span>ป่าบุคคลภายนอก ปี 2565 (160 แปลง) + ป่าชุมชน ปี 2566 ปีที่ 1–2 (93 ชุมชน) โดยแยกกองทุนชุมชน / PDD / VVB / Clear Advance ออกจาก BOQ ปลูกและดูแล</span></div>
       <button class="btn" id="openAllSpend">ดูเงินจ่ายแล้วทุกหมวดหมู่</button>
     </section>
 
@@ -86,9 +86,9 @@
 
     <section class="panel table-panel" id="plotPanel">
       <div class="section-head table-head">
-        <div><h2>ติดตามรายแปลง</h2><p id="tableSubtitle"></p></div>
+        <div><h2>ติดตามรายแปลง / ชุมชน</h2><p id="tableSubtitle"></p></div>
         <div class="table-actions">
-          <label>เรียงตาม <select id="sort"><option value="balance">คงเหลือสูงสุด</option><option value="paid">จ่ายแล้วสูงสุด</option><option value="boq">BOQ สูงสุด</option><option value="plot">รหัสแปลง</option></select></label>
+          <label>เรียงตาม <select id="sort"><option value="balance">คงเหลือสูงสุด</option><option value="paid">จ่ายแล้วสูงสุด</option><option value="boq">BOQ สูงสุด</option><option value="plot">รหัสแปลง / ชุมชน</option></select></label>
           <button class="btn" id="exportCsv">Export CSV</button>
         </div>
       </div>
@@ -96,14 +96,14 @@
       <div class="table-wrap" id="plotTableWrap">
         <table>
           <thead><tr>
-            <th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ชื่อ T-VER</th><th>TOKEN</th><th>รหัสแปลง</th><th>จังหวัด</th><th class="num">พื้นที่</th><th class="num" id="boqYearHead">BOQ ปี 3</th><th>งวดล่าสุด</th><th>งวดค้าง</th><th class="num">จ่ายแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th></th>
+            <th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ชื่อ T-VER</th><th>TOKEN</th><th>รหัสแปลง / ชุมชน</th><th>จังหวัด</th><th class="num">พื้นที่</th><th class="num" id="boqYearHead">BOQ ปี 3</th><th>งวดล่าสุด</th><th>งวดค้าง</th><th class="num">จ่ายแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th></th>
           </tr></thead>
           <tbody id="plotRows"></tbody>
         </table>
       </div>
     </section>
 
-    <footer><span id="sourceNote"></span><span>ยอดจ่ายระดับแปลงใช้ AP ที่ Tag เป็นงานปลูก/บำรุง และไม่รวม Clear Advance/PDD/VVB</span></footer>
+    <footer><span id="sourceNote"></span><span>ยอดจ่าย BOQ ใช้ ERP AP เฉพาะงานปลูก/บำรุง; กองทุนชุมชน / PDD / VVB / Clear Advance แสดงแยกและไม่หักจาก BOQ</span></footer>
   </main>
 
   <div class="modal-backdrop" id="modalBackdrop" hidden>
@@ -113,8 +113,6 @@
     </article>
   </div>
 
-  <script src="data-01.js"></script>
-  <script src="data-02.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
