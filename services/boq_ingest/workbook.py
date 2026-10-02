@@ -189,20 +189,45 @@ class Workbook:
         return str(c["value"]).strip()
 
     def number(self, sheet: str, ref: str, trail=()) -> Decimal:
+        """Financial fields must be numeric, never coerced text/formula results."""
+        value = self.value(sheet, ref, trail)
+        if not isinstance(value, Decimal):
+            raise ImportBlocked(f"NON_NUMERIC_FINANCIAL_CELL:{sheet}!{ref}")
+        return value
+
+    def value(self, sheet: str, ref: str, trail=()) -> Decimal | str | bool | None:
+        """Evaluate the supported subset while preserving Excel reference types.
+
+        Cached results/types never determine a formula's evaluated value. Unsupported
+        coercions fail closed; this is not an implementation of all Excel semantics.
+        """
         key = (sheet, ref)
         if key in self._resolved:
             return self._resolved[key]
         if key in trail or len(trail) >= 64:
             raise ImportBlocked(f"CIRCULAR_OR_DEEP_FORMULA:{sheet}!{ref}")
         c = self.cell(sheet, ref)
-        if c["type"] in ("e", "b"):
-            raise ImportBlocked(f"CELL_ERROR:{sheet}!{ref}")
         if c["formula"] is None:
-            result = decimal(c["value"])
+            if c["type"] == "e":
+                raise ImportBlocked(f"CELL_ERROR:{sheet}!{ref}")
+            if c["type"] in ("s", "inlineStr", "str"):
+                result = c["value"] if c["value"] is not None else ""
+            elif c["type"] == "b" and c["value"] in ("0", "1"):
+                result = c["value"] == "1"
+            elif c["type"] == "n":
+                result = None if c["value"] is None else decimal(c["value"])
+            else:
+                raise ImportBlocked(f"UNSUPPORTED_CELL_TYPE:{sheet}!{ref}")
         else:
             if c["formulaAttributes"].get("t") in ("shared", "array", "dataTable"):
                 raise ImportBlocked(f"UNSUPPORTED_FORMULA:{sheet}!{ref}")
-            expression = c["formula"].lstrip("=").upper().replace("$", "")
+            expression = c["formula"].removeprefix("=").strip()
+            # Literal strings are evaluated from the formula, NOT from cached <v>.
+            if len(expression) <= 1000 and re.fullmatch(r'"(?:[^\"]|"")*"', expression):
+                result = expression[1:-1].replace('""', '"')
+                self._resolved[key] = result
+                return result
+            expression = expression.upper().replace("$", "")
             if len(expression) > 1000 or any(ch in expression for ch in "![]\"'"):
                 raise ImportBlocked(f"UNSUPPORTED_FORMULA:{sheet}!{ref}")
             values = {}
@@ -219,14 +244,14 @@ class Workbook:
                 for row in range(a[1], b[1] + 1):
                     for col in range(ac, bc + 1):
                         target = f"{column_name(col)}{row}"
-                        source = self.cell(sheet, target)
-                        # Excel SUM ignores blank/text cells; direct arithmetic never does.
-                        if source["formula"] is None and (source["value"] is None or source["type"] in ("s", "inlineStr", "str")):
-                            continue
-                        nums.append(self.number(sheet, target, trail + (key,)))
+                        value = self.value(sheet, target, trail + (key,))
+                        # SUM over references ignores text, booleans and blanks,
+                        # including text returned by a formula. Errors still block.
+                        if isinstance(value, Decimal):
+                            nums.append(value)
                 return bind(sum(nums, Decimal(0)))
             expression = re.sub(r"SUM\(\s*([A-Z]+[1-9]\d*)\s*:\s*([A-Z]+[1-9]\d*)\s*\)", total, expression)
-            expression = re.sub(r"\b[A-Z]{1,3}[1-9]\d*\b", lambda m: bind(self.number(sheet, m[0], trail + (key,))), expression)
+            expression = re.sub(r"\b[A-Z]{1,3}[1-9]\d*\b", lambda m: bind(self.value(sheet, m[0], trail + (key,))), expression)
             try:
                 tree = ast.parse(expression, mode="eval")
                 def evaluate(node):
@@ -237,9 +262,14 @@ class Workbook:
                     if isinstance(node, ast.Constant) and type(node.value) in (int, float):
                         return decimal(ast.get_source_segment(expression, node))
                     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
-                        return evaluate(node.operand) * (-1 if isinstance(node.op, ast.USub) else 1)
+                        operand = evaluate(node.operand)
+                        if not isinstance(operand, Decimal):
+                            raise ImportBlocked("UNSUPPORTED_FORMULA_COERCION")
+                        return operand * (-1 if isinstance(node.op, ast.USub) else 1)
                     if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
                         left, right = evaluate(node.left), evaluate(node.right)
+                        if not isinstance(left, Decimal) or not isinstance(right, Decimal):
+                            raise ImportBlocked("UNSUPPORTED_FORMULA_COERCION")
                         if isinstance(node.op, ast.Add): return left + right
                         if isinstance(node.op, ast.Sub): return left - right
                         if isinstance(node.op, ast.Mult): return left * right
@@ -251,7 +281,8 @@ class Workbook:
             except (SyntaxError, ArithmeticError, RecursionError) as exc:
                 raise ImportBlocked(f"FORMULA_ERROR:{sheet}!{ref}") from exc
             # The cached <v> value is never used for formula cells.
-            result = decimal(format(result, "f"))
+            if isinstance(result, Decimal):
+                result = decimal(format(result, "f"))
         self._resolved[key] = result
         return result
 

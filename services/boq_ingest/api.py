@@ -41,6 +41,7 @@ class Preview(StrictBody):
 
 
 class Publish(StrictBody):
+    inputs: list[Input] = Field(min_length=1, max_length=8)
     previewId: str
     expectedRevision: str
     confirm: bool
@@ -166,7 +167,7 @@ def create_app(store: Store, assets: Path, ui: Path, admin_token: str) -> FastAP
     def publish(body: Publish):
         if not body.confirm:
             raise ImportBlocked("PUBLISH_CONFIRMATION_REQUIRED")
-        return store.publish(body.previewId, body.expectedRevision)
+        return store.publish(body.previewId, body.expectedRevision, [x.model_dump() for x in body.inputs])
 
     @app.post("/api/rollback")
     def rollback(body: Rollback):

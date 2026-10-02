@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+from pydantic import ValidationError
 from .core import Profile, baseline_keys, make_preview, validate_profile
 from .workbook import Workbook, ImportBlocked, MAX_UPLOAD, digest
 
@@ -72,11 +73,12 @@ class Store:
         matched = []
         with self.connection() as db:
             for row in db.execute("SELECT id,body FROM profiles"):
-                profile = Profile.model_validate_json(row["body"])
                 try:
+                    profile = Profile.model_validate_json(row["body"])
                     validate_profile(workbook, profile)
                     matched.append({"id": row["id"], "name": profile.name, "profile": profile.model_dump()})
-                except ImportBlocked:
+                except (ImportBlocked, ValidationError):
+                    # V1 lacks required year/identity checks; never auto-migrate approval.
                     pass
         return {"uploadId": workbook.sha256, "name": name, "inspection": workbook.inspect(), "matchingProfiles": matched}
 
@@ -106,7 +108,11 @@ class Store:
             profile = db.execute("SELECT body FROM profiles WHERE id=?", (item["profileId"],)).fetchone()
             if raw is None or profile is None:
                 raise ImportBlocked("UPLOAD_OR_APPROVED_PROFILE_NOT_FOUND")
-            resolved.append((Workbook(raw[0]), Profile.model_validate_json(profile[0])))
+            try:
+                approved = Profile.model_validate_json(profile[0])
+            except ValidationError as exc:
+                raise ImportBlocked("PROFILE_UPGRADE_REVIEW_REQUIRED") from exc
+            resolved.append((Workbook(raw[0]), approved))
         return resolved
 
     def preview(self, inputs, expected_revision):
@@ -122,12 +128,17 @@ class Store:
             db.execute("INSERT INTO previews VALUES(?,?,?,?,?,?)", (preview_id, current, dump(inputs), dump(report), None, now()))
             return report
 
-    def publish(self, preview_id, expected_revision):
+    def publish(self, preview_id, expected_revision, expected_inputs):
         with self.connection(write=True) as db:
             preview = db.execute("SELECT * FROM previews WHERE id=?", (preview_id,)).fetchone()
             current = db.execute("SELECT revision FROM current").fetchone()[0]
             if preview is None:
                 raise ImportBlocked("PREVIEW_NOT_FOUND")
+            # Check before replay as well. A result for a removed/replaced source
+            # must never authorize the caller's different current batch.
+            canonical = lambda xs: sorted(xs, key=lambda x: (x["uploadId"], x["profileId"]))
+            if preview["base"] != expected_revision or canonical(expected_inputs) != canonical(json.loads(preview["inputs"])):
+                raise ImportBlocked("STALE_PREVIEW_INPUTS")
             if preview["result"]:
                 return {"revision": preview["result"], "currentRevision": current, "alreadyPublished": True}
             if preview["base"] != current or current != expected_revision:

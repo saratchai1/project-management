@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from collections import defaultdict
 from decimal import Decimal
 from typing import Literal
@@ -12,14 +13,32 @@ FIELDS = {"boq", "paid"}
 TOLERANCE = Decimal("0.01")
 
 
+class YearAnchor(BaseModel):
+    """Machine-checked operating year, not a reviewer-supplied default."""
+    model_config = ConfigDict(extra="forbid", strict=True)
+    kind: Literal["sheet_name", "cell"]
+    cell: str | None = None
+
+    @model_validator(mode="after")
+    def validate_anchor(self):
+        if self.kind == "cell":
+            if self.cell is None:
+                raise ValueError("A year cell is required")
+            address(self.cell)
+        elif self.cell is not None:
+            raise ValueError("Sheet-name anchors cannot specify a cell")
+        return self
+
+
 class Region(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     sheet: str = Field(min_length=1, max_length=100)
     portfolio: str = Field(min_length=1, max_length=100)
     year: int = Field(ge=1, le=100)
+    year_anchor: YearAnchor
     start_row: int = Field(ge=1, le=30000)
     end_row: int = Field(ge=1, le=30000)
-    columns: dict[Literal["plotCode", "boq", "paid"], str]
+    columns: dict[Literal["plotCode", "contractNo", "projectCode", "boq", "paid"], str]
     header_cells: dict[str, str]
     totals: dict[Literal["boq", "paid"], str]
     ignored_rows: dict[str, str] = Field(default_factory=dict)
@@ -27,8 +46,10 @@ class Region(BaseModel):
     @model_validator(mode="after")
     def validate_mapping(self):
         fields = set(self.columns) & FIELDS
-        if not fields or "plotCode" not in self.columns or set(self.totals) != fields:
-            raise ValueError("Map plotCode and at least one financial field, with a source total for each")
+        if not fields or not {"plotCode", "contractNo", "projectCode"}.issubset(self.columns) or set(self.totals) != fields:
+            raise ValueError("Map plotCode, contractNo, projectCode and financial fields with control totals")
+        if self.year_anchor.kind == "cell" and address(self.year_anchor.cell)[1] >= self.start_row:
+            raise ValueError("Operating-year context must precede data rows")
         if self.end_row < self.start_row or not self.header_cells:
             raise ValueError("Invalid data region or missing header anchors")
         if len(set(self.columns.values())) != len(self.columns):
@@ -55,6 +76,7 @@ class Region(BaseModel):
 
 class Profile(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+    schema_version: Literal[2]
     name: str = Field(min_length=3, max_length=120)
     layout_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     regions: list[Region] = Field(min_length=1, max_length=80)
@@ -72,6 +94,11 @@ def validate_profile(workbook: Workbook, profile: Profile):
     if any(len(x.strip()) < 4 for x in profile.ignored_sheets.values()):
         raise ImportBlocked("IGNORED_SHEET_REASON_REQUIRED")
     for r in profile.regions:
+        context = r.sheet if r.year_anchor.kind == "sheet_name" else workbook.text(r.sheet, r.year_anchor.cell)
+        context = context.strip().translate(str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789"))
+        match = re.fullmatch(r"(?:(?:ปี(?:ที่|ดูแลที่)?|(?:care\s+)?year)\s*)?([1-9]\d{0,2})", context, re.I)
+        if not match or int(match[1]) != r.year:
+            raise ImportBlocked(f"OPERATING_YEAR_MISMATCH:{r.sheet}")
         for ref, expected in r.header_cells.items():
             if workbook.text(r.sheet, ref) != expected.strip():
                 raise ImportBlocked(f"HEADER_CHANGED:{r.sheet}!{ref}")
@@ -120,6 +147,15 @@ def make_preview(baseline: dict, inputs: list[tuple[Workbook, Profile]]) -> dict
                         raise ImportBlocked(f"UNMAPPED_PLOT:{r.sheet}!{r.columns['plotCode']}{row}")
                     if key in seen:
                         raise ImportBlocked(f"DUPLICATE_PLOT:{r.sheet}!{row}")
+                    p, y = keys[key]
+                    contract = y["contractNo"] if "contractNo" in y else p.get("contractNo")
+                    expected_ids = {"contractNo": contract, "projectCode": p.get("projectCode")}
+                    for identity, expected_id in expected_ids.items():
+                        if not isinstance(expected_id, str) or not expected_id.strip():
+                            raise ImportBlocked(f"BASELINE_IDENTITY_REQUIRED:{identity}:{code}")
+                        source_id = workbook.text(r.sheet, r.columns[identity] + str(row))
+                        if source_id != expected_id.strip():
+                            raise ImportBlocked(f"SOURCE_IDENTITY_MISMATCH:{identity}:{r.sheet}!{r.columns[identity]}{row}")
                     seen.add(key)
                     record = changes.setdefault(key, {})
                     for f in sorted(fields):
@@ -131,7 +167,10 @@ def make_preview(baseline: dict, inputs: list[tuple[Workbook, Profile]]) -> dict
                         sums[f] += value
                         provenance.append({"portfolio": r.portfolio, "plotCode": code, "year": r.year, "field": f,
                             "sourceSha256": workbook.sha256, "sheet": r.sheet, "cell": ref,
-                            "sourceDecimal": format(value, "f"), "formula": workbook.cell(r.sheet, ref)["formula"]})
+                            "sourceDecimal": format(value, "f"), "formula": workbook.cell(r.sheet, ref)["formula"],
+                            "contractNo": contract, "projectCode": p["projectCode"],
+                            "identityCells": {f: r.columns[f] + str(row) for f in expected_ids},
+                            "yearAnchor": r.year_anchor.model_dump()})
                 if seen != expected:
                     raise ImportBlocked(f"INCOMPLETE_SCOPE:expected={len(expected)},parsed={len(seen)}")
                 checks.append({"kind": "scope", "portfolio": r.portfolio, "year": r.year, "expected": len(expected), "parsed": len(seen), "pass": True})
@@ -155,8 +194,12 @@ def make_preview(baseline: dict, inputs: list[tuple[Workbook, Profile]]) -> dict
     code_delta = defaultdict(Decimal)
     portfolio_budget_delta = defaultdict(Decimal)
     diffs = []
+    evidence = {(x["portfolio"], x["plotCode"], x["year"], x["field"]): x for x in provenance}
+    evidence_fields = ("possiblePaid", "possibleBalance", "paymentDataAvailable", "paymentConfidence",
+                       "status", "installmentDataAvailable", "fieldProvenance")
     for key, values in sorted(changes.items()):
         p, y = updated[key]
+        before_year = copy.deepcopy(y)
         old = {f: decimal(y.get(f)) for f in FIELDS}
         new = {**old, **values}
         if new["paid"] > new["boq"] + TOLERANCE:
@@ -165,26 +208,39 @@ def make_preview(baseline: dict, inputs: list[tuple[Workbook, Profile]]) -> dict
         if y.get("status") in ("future", "not_contracted") and new["paid"] > 0:
             issues.append({"code": "PAYMENT_FOR_INACTIVE_CONTRACT_REVIEW_REQUIRED", "plotCode": key[1], "year": key[2]})
             continue
-        changed = any(old[f] != new[f] for f in FIELDS)
-        diffs.append({"portfolio": key[0], "plotCode": key[1], "year": key[2],
-                      "before": {f: str(old[f]) for f in sorted(FIELDS)}, "after": {f: str(new[f]) for f in sorted(FIELDS)}, "changed": changed})
-        if not changed:
-            continue
         budget_delta = new["boq"] - old["boq"]
-        code_delta[p["projectCode"]] += new["paid"] - old["paid"]
+        paid_delta = new["paid"] - old["paid"]
+        numeric_changed = any(old[f] != new[f] for f in FIELDS)
+        code_delta[p["projectCode"]] += paid_delta
         portfolio_budget_delta[p["portfolio"]] += budget_delta
-        p["total10y"] = float(decimal(p["total10y"]) + budget_delta)
-        y.update({f: float(new[f]) for f in FIELDS})
-        y.update(balance=float(max(Decimal(0), new["boq"] - new["paid"])), possiblePaid=float(new["paid"]),
-                 possibleBalance=float(max(Decimal(0), new["boq"] - new["paid"])), over=float(max(Decimal(0), new["paid"] - new["boq"])))
+        if budget_delta:
+            p["total10y"] = float(decimal(p["total10y"]) + budget_delta)
+        # Only the supplied source owns the corresponding field/authority.
+        y.update({f: float(values[f]) for f in values})
+        y.update(balance=float(max(Decimal(0), new["boq"] - new["paid"])),
+                 over=float(max(Decimal(0), new["paid"] - new["boq"])))
         if "paid" in values:
-            y.update(paymentDataAvailable=True, paymentConfidence="reviewed_cumulative_ap_snapshot")
-        if y.get("status") not in ("future", "not_contracted"):
+            y.update(paymentDataAvailable=True, paymentConfidence="reviewed_cumulative_ap_snapshot",
+                     possiblePaid=float(new["paid"]))
+        upper = y.get("possiblePaid", new["paid"])
+        y["possibleBalance"] = None if upper is None else float(max(Decimal(0), new["boq"] - decimal(upper)))
+        if y.get("status") not in ("future", "not_contracted") and ("paid" in values or
+                (y.get("paymentDataAvailable") is True and y.get("status") != "no_data")):
             y["status"] = "paid" if y["balance"] <= .01 else "partial" if new["paid"] > 0 else "not_started"
-        # Never manufacture chronological installment allocations from an annual total.
-        y.update(installments=[], pendingInstallments=[], latestFullInstallment=0, latestPaymentInstallments=[],
-                 latestPaymentDate=None, latestPaymentAmount=None, installmentDataAvailable=False,
-                 installmentDataReason="Annual balance updated; installment allocation requires a separate reviewed source")
+        # A confirmed zero is evidence even when its numeric delta is zero.
+        y.setdefault("fieldProvenance", {}).update({f: evidence[(*key, f)] for f in values})
+        if budget_delta or "paid" in values:
+            # Never manufacture installment allocations from annual evidence.
+            y.update(installments=[], pendingInstallments=[], latestFullInstallment=0, latestPaymentInstallments=[],
+                     latestPaymentDate=None, latestPaymentAmount=None, installmentDataAvailable=False,
+                     installmentDataReason="Annual source reviewed; installment allocation requires a separate reviewed source")
+        before_evidence = {f: before_year.get(f) for f in evidence_fields}
+        after_evidence = {f: copy.deepcopy(y.get(f)) for f in evidence_fields}
+        diffs.append({"portfolio": key[0], "plotCode": key[1], "year": key[2],
+                      "before": {f: str(old[f]) for f in sorted(FIELDS)}, "after": {f: str(new[f]) for f in sorted(FIELDS)},
+                      "numericChanged": numeric_changed, "evidenceChanged": before_evidence != after_evidence,
+                      "beforeEvidence": before_evidence, "afterEvidence": after_evidence,
+                      "changed": before_year != y})
 
     projects = {p["code"]: p for p in candidate["projectCodes"]}
     for code, delta in code_delta.items():
@@ -209,6 +265,7 @@ def make_preview(baseline: dict, inputs: list[tuple[Workbook, Profile]]) -> dict
     candidate.setdefault("meta", {})["ingestion"] = {"previousErpAsOf": baseline.get("meta", {}).get("erpAsOf"), "kind": "reviewed_scoped_snapshot", "sourceHashes": [w.sha256 for w, _ in inputs],
         "scope": [{"portfolio": p, "year": y, "field": f} for p, y, f in sorted(seen_scopes)],
         "warnings": ["AP postings are not bank-cleared cash", "Annual totals do not establish installment allocations", "Unchanged scopes retain their previous source date"]}
-    candidate["meta"]["erpAsOf"] = "หลายแหล่งข้อมูล — ดูประวัตินำเข้า"
+    if any(f == "paid" for _, _, f in seen_scopes):
+        candidate["meta"]["erpAsOf"] = "หลายแหล่งข้อมูล — ดูประวัตินำเข้า"
     return {"status": "BLOCKED" if issues else "PASS", "issues": issues, "checks": checks, "provenance": provenance,
             "diff": diffs, "candidate": None if issues else candidate}

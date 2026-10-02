@@ -41,7 +41,10 @@ def baseline():
 
 
 def xlsx(changes=None, extra_sheet=False, extra_entry=None, hidden=False):
-    cells={"A1":"รหัสแปลง","B1":"BOQ","C1":"AP สะสม","A2":"14-STC","B2":100,"C2":60,
+    cells={"A1":"รหัสแปลง","B1":"BOQ","C1":"AP สะสม",
+        "D1":"เลขที่สัญญา","D2":"TEST-CONTRACT-14-STC","D3":"TEST-CONTRACT-14(1)-STC",
+        "G1":"รหัสโครงการ","G2":"TEST-PROJECT","G3":"TEST-PROJECT",
+        "A2":"14-STC","B2":100,"C2":60,
         "A3":"14(1)-STC","B3":200,"C3":80,"A4":"รวม","B4":("SUM(B2:B3)",1),"C4":("SUM(C2:C3)",1)}
     cells.update(changes or {})
     rows={}
@@ -79,10 +82,10 @@ def xlsx(changes=None, extra_sheet=False, extra_entry=None, hidden=False):
 
 
 def profile(workbook, fields=("boq","paid")):
-    columns={"plotCode":"A",**{f:{"boq":"B","paid":"C"}[f] for f in fields}}
-    headers={"A1":"รหัสแปลง",**{{"boq":"B1","paid":"C1"}[f]:{"boq":"BOQ","paid":"AP สะสม"}[f] for f in fields}}
-    return Profile.model_validate({"name":"Synthetic annual balances","layout_hash":workbook.layout_hash,
-        "semantics":"boq-budget_and_or_cumulative-ap-postings","regions":[{"sheet":"ปี3","portfolio":"forest65_external","year":3,
+    columns={"plotCode":"A","contractNo":"D","projectCode":"G",**{f:{"boq":"B","paid":"C"}[f] for f in fields}}
+    headers={"A1":"รหัสแปลง","D1":"เลขที่สัญญา","G1":"รหัสโครงการ",**{{"boq":"B1","paid":"C1"}[f]:{"boq":"BOQ","paid":"AP สะสม"}[f] for f in fields}}
+    return Profile.model_validate({"schema_version":2,"name":"Synthetic annual balances","layout_hash":workbook.layout_hash,
+        "semantics":"boq-budget_and_or_cumulative-ap-postings","regions":[{"sheet":"ปี3","portfolio":"forest65_external","year":3,"year_anchor":{"kind":"sheet_name"},
             "start_row":2,"end_row":3,"columns":columns,"header_cells":headers,"totals":{f:{"boq":"B4","paid":"C4"}[f] for f in fields}}]})
 
 
@@ -157,7 +160,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(original.layout_hash,changed.layout_hash)
         with self.assertRaises(ImportBlocked):validate_profile(changed,profile(original))
     def test_new_shape_requires_review(self):
-        original=Workbook(xlsx());changed=Workbook(xlsx({'D1':'New'}))
+        original=Workbook(xlsx());changed=Workbook(xlsx({'H1':'New'}))
         with self.assertRaises(ImportBlocked):validate_profile(changed,profile(original))
     def test_changed_amounts_match_existing_profile(self):
         original=Workbook(xlsx());changed=Workbook(xlsx({'C2':70}));validate_profile(changed,profile(original))
@@ -181,19 +184,19 @@ class StoreTests(unittest.TestCase):
         raw=xlsx();w=Workbook(raw);u=self.store.upload(raw,'fake.xlsx');p=self.store.approve(u['uploadId'],profile(w),'Reviewed synthetic annual AP meaning')
         self.inputs=[{'uploadId':u['uploadId'],'profileId':p['profileId']}];self.revision=self.store.current()['revision']
     def test_publish_and_idempotent_replay(self):
-        report=self.store.preview(self.inputs,self.revision);pub=self.store.publish(report['previewId'],self.revision)
-        again=self.store.publish(report['previewId'],self.revision);self.assertEqual(pub['revision'],again['revision']);self.assertTrue(again['alreadyPublished'])
+        report=self.store.preview(self.inputs,self.revision);pub=self.store.publish(report['previewId'],self.revision,self.inputs)
+        again=self.store.publish(report['previewId'],self.revision,self.inputs);self.assertEqual(pub['revision'],again['revision']);self.assertTrue(again['alreadyPublished'])
         self.assertEqual(len(self.store.history()),2)
     def test_stale_preview_cannot_overwrite(self):
         a=self.store.preview(self.inputs,self.revision);b=self.store.preview(self.inputs,self.revision)
-        self.store.publish(a['previewId'],self.revision)
-        with self.assertRaisesRegex(ImportBlocked,'STALE'):self.store.publish(b['previewId'],self.revision)
+        self.store.publish(a['previewId'],self.revision,self.inputs)
+        with self.assertRaisesRegex(ImportBlocked,'STALE'):self.store.publish(b['previewId'],self.revision,self.inputs)
     def test_rollback_is_new_revision(self):
-        report=self.store.preview(self.inputs,self.revision);pub=self.store.publish(report['previewId'],self.revision)
+        report=self.store.preview(self.inputs,self.revision);pub=self.store.publish(report['previewId'],self.revision,self.inputs)
         restored=self.store.rollback(self.revision,pub['revision'],'Restore baseline for test')
         self.assertNotEqual(restored['revision'],self.revision);self.assertEqual(len(self.store.history()),3)
         self.assertEqual(self.store.current()['data'],baseline())
-        self.store.publish(report['previewId'],self.revision)  # replay cannot undo rollback
+        self.store.publish(report['previewId'],self.revision,self.inputs)  # replay cannot undo rollback
         self.assertEqual(self.store.current()['revision'],restored['revision'])
     def test_reupload_is_deduplicated_and_profile_reused(self):
         item=self.store.upload(xlsx(),'another-name.xlsx');self.assertEqual(len(item['matchingProfiles']),1)
@@ -205,10 +208,10 @@ class StoreTests(unittest.TestCase):
         raw=xlsx({'C4':1});w=Workbook(raw);u=self.store.upload(raw,'bad.xlsx');p=self.store.approve(u['uploadId'],profile(w),'Header reviewed but amounts differ')
         r=self.store.preview([{'uploadId':u['uploadId'],'profileId':p['profileId']}],self.revision)
         self.assertEqual(r['status'],'BLOCKED')
-        with self.assertRaises(ImportBlocked):self.store.publish(r['previewId'],self.revision)
+        with self.assertRaises(ImportBlocked):self.store.publish(r['previewId'],self.revision,[{'uploadId':u['uploadId'],'profileId':p['profileId']}])
         self.assertEqual(self.store.current()['revision'],self.revision)
     def test_state_survives_process_restart(self):
-        report=self.store.preview(self.inputs,self.revision);self.store.publish(report['previewId'],self.revision)
+        report=self.store.preview(self.inputs,self.revision);self.store.publish(report['previewId'],self.revision,self.inputs)
         restarted=Store(Path(self.tmp.name),baseline());self.assertEqual(restarted.current(),self.store.current())
 
 
