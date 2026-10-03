@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+  const staticDemo = location.hostname.endsWith('github.io');
   const state = {csrf:'', current:null, uploads:[], selected:null, report:null, busy:false, generation:0};
   const fmt = new Intl.NumberFormat('th-TH', {maximumFractionDigits:2});
   const money = v => v == null ? 'ไม่ทราบ' : fmt.format(Number(v));
@@ -11,7 +12,7 @@
     if(body!==undefined){options.body=body instanceof File?body:JSON.stringify(body);if(!(body instanceof File))options.headers['Content-Type']='application/json';}
     const response=await fetch(path,options);
     const result=await response.json();
-    if(!response.ok){if(response.status===401){$('login').hidden=false;$('workspace').hidden=true;}throw Error(typeof result.error==='string'?result.error:JSON.stringify(result.detail||result));}
+    if(!response.ok){if(response.status===401&&$('login')){$('login').hidden=false;$('workspace').hidden=true;}throw Error(typeof result.error==='string'?result.error:JSON.stringify(result.detail||result));}
     return result;
   }
   const inputs = () => state.uploads.map(x=>({uploadId:x.uploadId,profileId:x.profileId}));
@@ -33,9 +34,9 @@
     $('history').replaceChildren(...history.map(h=>{const label=new Intl.DateTimeFormat('th-TH',{dateStyle:'short',timeStyle:'short',timeZone:'Asia/Bangkok'}).format(new Date(h.createdAt));const option=el('option',`${label} · ${h.event.kind} · ${h.revision.slice(0,12)}`);option.value=h.revision;return option;}));
     $('login').hidden=true;$('workspace').hidden=false;invalidate();
   }
-  $('loginForm').addEventListener('submit',event=>{event.preventDefault();task(async()=>{const token=$('token').value;const result=await api('/api/session',{method:'POST',headers:{Authorization:'Bearer '+token}});$('token').value='';state.csrf=result.csrf;await refresh();message('เข้าสู่ระบบแล้ว');});});
-  $('logout').onclick=()=>task(async()=>{await api('/api/logout',{method:'POST'});location.reload();});
-  $('refresh').onclick=()=>task(refresh);
+  if($('loginForm')) $('loginForm').addEventListener('submit',event=>{event.preventDefault();task(async()=>{const token=$('token').value;const result=await api('/api/session',{method:'POST',headers:{Authorization:'Bearer '+token}});$('token').value='';state.csrf=result.csrf;await refresh();message('เข้าสู่ระบบแล้ว');});});
+  if($('logout')) $('logout').onclick=()=>task(async()=>{await api('/api/logout',{method:'POST'});location.reload();});
+  $('refresh').onclick=()=>staticDemo?message('Public demo ไม่มี private backend ให้รีเฟรชสถานะ',true):task(refresh);
   function renderUploads(){
     $('uploads').replaceChildren();
     for(const file of state.uploads){
@@ -110,5 +111,14 @@
   });
   $('downloadReport').onclick=()=>{if(!state.report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(state.report,null,2)],{type:'application/json'})),a=el('a');a.href=url;a.download='boq-import-report-'+state.report.previewId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   $('rollback').onclick=()=>task(async()=>{const result=await api('/api/rollback',{method:'POST',body:{revision:$('history').value,expectedRevision:state.current.revision,reason:$('rollbackReason').value,confirm:$('rollbackConsent').checked}});$('rollbackConsent').checked=false;await refresh();message('ย้อนกลับแล้ว โดยสร้างเวอร์ชันใหม่: '+result.revision);});
-  task(async()=>{try{const session=await api('/api/session');state.csrf=session.csrf;await refresh();}catch(error){if(error.message!=='AUTH_REQUIRED')throw error;}});
+  if(staticDemo){
+    state.current={revision:'PUBLIC-DEMO',data:null};
+    $('revision').textContent='PUBLIC DEMO';
+    const disabledIds=['files','preview','publish','approve','sampleAI','suggestAI','rollback','history','rollbackReason','rollbackConsent','publishConsent'];
+    for(const id of disabledIds){const node=$(id);if(node)node.disabled=true;}
+    const dropzone=$('dropzone');if(dropzone){dropzone.style.opacity='.55';dropzone.style.cursor='not-allowed';dropzone.onclick=e=>e.preventDefault();}
+    message('เปิด Public Demo แล้ว — ไม่ต้องใช้รหัสผ่าน; การอัปโหลด/Publish ต้องเชื่อม private backend ก่อน');
+  }else{
+    task(async()=>{try{const session=await api('/api/session');state.csrf=session.csrf;await refresh();}catch(error){if(error.message!=='AUTH_REQUIRED')throw error;}});
+  }
 })();
