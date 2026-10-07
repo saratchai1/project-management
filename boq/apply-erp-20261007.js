@@ -141,6 +141,6 @@ console.log(JSON.stringify({
   erpAsOf:data.meta.erpAsOf,
   source:data.meta.erpSource,
   incrementalApDelta:round2(delta.apDelta),
-  external65:{year1Paid,y2Paid:round2(y2Paid),year3Paid,year3Delta:boqDelta,changedPlots:changedEntries.length,totalAp:pf65.totalAp},
+  external65:{year1Paid:y1Paid,year2Paid:y2Paid,year3Paid:y3Paid,year3Delta:boqDelta,changedPlots:changedEntries.length,totalAp:pf65.totalAp},
   output:dataPath
 }));
