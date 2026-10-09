@@ -33,6 +33,26 @@
   const val = (sheet,row,col) => col < 0 ? null : (sheet.rows[row]||[])[col];
   const nonempty = row => row.some(v => txt(v) !== '');
   const colName = col => XLSX.utils.encode_col(col);
+  // Excel's core document properties describe creation time; never substitute upload or modification time.
+  function parseCreationDate(value){
+    if(value == null || value === '')return null;
+    if(!(value instanceof Date) && (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(value.trim())))return null;
+    const date=value instanceof Date ? value : new Date(value.trim());
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+  }
+  const formatCreated = value => new Intl.DateTimeFormat('th-TH',{
+    day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',
+    hourCycle:'h23',timeZone:'Asia/Bangkok',calendar:'buddhist',numberingSystem:'latn'
+  }).format(new Date(value))+' น.';
+  function renderCreationDate(){
+    const file=chosenFile(),info=$('excelCreatedInfo');
+    if(!info)return;
+    info.hidden=!file;
+    if(!file)return;
+    $('excelCreatedDate').textContent=file.createdDate?formatCreated(file.createdDate):'ไม่พบข้อมูลใน Excel';
+    $('excelCreatedFile').textContent=file.name;
+    info.title='วันที่สร้างจากคุณสมบัติภายในไฟล์ Excel ไม่ใช่วันที่อัปโหลดหรือวันที่แก้ไขล่าสุด';
+  }
 
   async function readWorkbook(file) {
     if (!window.XLSX || typeof XLSX.read !== 'function') throw Error('โหลดตัวอ่าน Excel ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตและรีเฟรชหน้านี้');
@@ -62,7 +82,7 @@
       for (const row of rows) if (row && nonempty(row)) populated++;
       sheets.push({name,worksheet,rows,lastRow:range.e.r,lastCol:range.e.c,nonemptyRows:populated,formulaCount:formulas});
     }
-    return {name:filename(file.name),size:file.size,sheets};
+    return {name:filename(file.name),size:file.size,sheets,createdDate:parseCreationDate(workbook.Props?.CreatedDate)};
   }
 
   function guessHeader(sheet) {
@@ -112,6 +132,7 @@
   }
   function renderInspection(){
     const panel=$('localReview'),file=chosenFile();
+    renderCreationDate();
     panel.hidden=!file;
     if(!file)return;
     $('localName').textContent=file.name;
