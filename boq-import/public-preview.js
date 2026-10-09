@@ -47,7 +47,12 @@
       if (range.e.r >= MAX_ROWS || range.e.c >= MAX_COLS || (range.e.r+1)*(range.e.c+1) > MAX_CELLS) {
         throw Error('Worksheet "'+name+'" ใหญ่เกินขีดจำกัดการตรวจบน Browser (30,000 แถว / 256 คอลัมน์ / 250,000 เซลล์)');
       }
-      const rows = XLSX.utils.sheet_to_json(worksheet,{header:1,raw:true,defval:null,blankrows:true,range:0});
+      // Read by absolute Excel coordinates. sheet_to_json shifts columns for ranges such as B4:K10.
+      const rows=Array.from({length:range.e.r+1},()=>[]);
+      for(let row=range.s.r;row<=range.e.r;row++)for(let col=range.s.c;col<=range.e.c;col++){
+        const entry=worksheet[XLSX.utils.encode_cell({r:row,c:col})];
+        if(entry&&entry.v!==undefined)rows[row][col]=entry.v;
+      }
       let populated=0,formulas=0;
       for (const key of Object.keys(worksheet)) {
         if (key[0]==='!') continue;
