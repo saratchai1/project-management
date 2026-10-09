@@ -45,6 +45,15 @@ jobs:
           node --check carbon-token-gantt/hkk.js
           grep -q 'hkk.js' carbon-token-gantt/index.html
           grep -q 'hkk.css' carbon-token-gantt/index.html
+      - name: Prepare automatic BOQ upload workspace
+        run: |
+          python3 boq-import/build_workspace.py --publish-entry
+          node --check boq-import/baseline.js
+          node --check boq-import/xlsx-reader.js
+          node --check boq-import/erp-adapter.js
+          node --check boq-import/dashboard.js
+          node --check boq-import/workspace.js
+          node boq-import/tests/workspace.cjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="#0b3b35" name="theme-color"/>
+<title>BOQ · อัปโหลดเพิ่ม / เซฟผล / Reset</title>
+<meta content="อัปโหลด Excel เพื่อสร้าง BOQ Dashboard อัตโนมัติ รวมรายการซ้ำโดยใช้ไฟล์ล่าสุด เซฟผลในเครื่อง และ Reset ได้" name="description"/>
+<link href="../boq/styles.css" rel="stylesheet"/><link href="workspace.css?v=20261009-workspace1" rel="stylesheet"/><link href="../favicon.svg" rel="icon" type="image/svg+xml"/></head>
+<body>
+<header class="topbar auto-topbar">
+<div><div class="eyebrow">PROJECT FINANCE CONTROL</div><h1>BOQ จากไฟล์ Excel</h1><p>มูลค่างาน ยอด AP และคงเหลือรายแปลง</p></div>
+<div class="auto-header-actions">
+<div class="created-info" hidden="" id="resultCreated"><span>จัดทำเมื่อ</span><strong id="resultCreatedTime"></strong><small id="saveState">ยังไม่ได้เซฟผล</small></div>
+<button class="btn" data-choose="" type="button">อัปโหลด Excel</button>
+<button class="btn save-button" disabled="" id="saveResult" type="button">เซฟผล</button><button class="btn reset-button" disabled="" id="resetAll" type="button">Reset</button></div>
+</header>
+<input accept=".xlsx" hidden="" id="autoFile" multiple="" type="file"/>
+<div class="shell auto-shell">
+<section class="auto-upload panel" id="uploadIntro">
+<div class="upload-eyebrow">EXCEL → BOQ DASHBOARD</div>
+<h2>อัปโหลด Excel เพื่อเริ่มต้น</h2>
+<p>ยังไม่มีกราฟ — เลือกไฟล์บริหารเงิน TC–ROK แล้วระบบจะแสดงผลให้อัตโนมัติ</p>
+<div class="auto-drop" id="dropArea">
+<span aria-hidden="true" class="upload-symbol">↑</span>
+<button class="btn choose-primary" data-choose="" type="button">เลือกไฟล์ Excel</button>
+<span>หรือลากไฟล์มาวางที่นี่</span><small>.xlsx ไม่เกิน 20 MB ต่อไฟล์ • เลือกได้หลายไฟล์</small>
+</div>
+<p class="privacy-copy">ไฟล์อ่านบนเครื่องนี้ ไม่ส่งขึ้น Server • รายการซ้ำใช้ไฟล์หลัง • กดเซฟผลก่อนปิด</p>
+</section>
+<div aria-live="polite" class="auto-status" hidden="" id="autoStatus" role="status"></div>
+<div aria-label="กำลังอ่านข้อมูล" class="auto-progress" hidden="" id="autoProgress"><span></span></div>
+<section class="source-strip" hidden="" id="sourceBar">
+<div><strong id="sourceName"></strong><span id="sourceSummary"></span></div>
+<p id="updateSummary"></p>
+<details><summary>รายละเอียดการอ่านไฟล์</summary><pre id="readDetails"></pre><button class="btn secondary" id="downloadSnapshot" type="button">ดาวน์โหลดสำเนาผลลัพธ์ HTML</button></details>
+</section>
+</div>
+<main class="shell" hidden="" id="financeDashboard">
+<section class="notice">
+<div><strong>ฐาน BOQ ที่ใช้ใน Dashboard</strong><span>ป่าบุคคลภายนอก ปี 2565 + ป่าชุมชน ปี 2566 ปีที่ 1–2 + ป่าบุคคลภายนอก ปี 2566 โดยป่าชุมชนแยก “BOQ ตามแผน” ออกจาก “มูลค่าสัญญาที่ทำแล้ว” และไม่ถือชุมชนที่ยังไม่ทำสัญญาเป็นยอดค้างจ่าย</span></div>
+<button class="btn" id="openAllSpend">ดูเงินจ่ายแล้วทุกหมวดหมู่</button>
+</section>
+<section aria-label="ตัวกรอง" class="panel filters">
+<div class="field wide">
+<label for="search">ค้นหา</label>
+<input id="search" placeholder="รหัสโครงการ, แปลง, สัญญา, จังหวัด, ชื่อ T-VER..." type="search"/>
+</div>
+<div class="field">
+<label for="portfolio">ประเภทโครงการ</label>
+<select id="portfolio"></select>
+</div>
+<div class="field">
+<label for="projectCode">รหัสโครงการ</label>
+<select id="projectCode"><option value="">ทั้งหมด</option></select>
+</div>
+<div class="field">
+<label for="year">ปีดำเนินงาน</label>
+<select id="year"></select>
+</div>
+<div class="field">
+<label for="company">ผู้รับเหมา</label>
+<select id="company"><option value="">ทั้งหมด</option></select>
+</div>
+<div class="field">
+<label for="province">จังหวัด</label>
+<select id="province"><option value="">ทั้งหมด</option></select>
+</div>
+<div class="field">
+<label for="token">TOKEN</label>
+<select id="token"><option value="">ทั้งหมด</option></select>
+</div>
+<button class="btn secondary" id="reset">ล้างตัวกรอง</button>
+</section>
+<section class="portfolio-grid" id="portfolioCards"></section>
+<section class="kpis" id="kpis"></section>
+<section class="grid-2">
+<article class="panel">
+<div class="section-head"><div><h2>สถานะรายปี</h2><p>BOQ เทียบ ERP AP ของแปลงที่ผ่านตัวกรอง</p></div></div>
+<div class="year-bars" id="yearBars"></div>
+</article>
+<article class="panel">
+<div class="section-head"><div><h2>แยกประเภทงานตามรหัสโครงการ</h2><p>งานที่ไม่มี BOQ ตายตัวแสดงเป็นยอดสะสมถึงวันที่ ERP ล่าสุด</p></div></div>
+<div class="work-bars" id="workTypeBars"></div>
+</article>
+</section>
+<section class="panel code-panel">
+<div class="section-head"><div><h2>Project Code Register</h2><p>รหัสโครงการคือจุดตั้งต้นในการ Tag รายการเงิน</p></div></div>
+<div class="table-wrap">
+<table class="compact">
+<thead><tr><th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ผู้รับเหมา</th><th class="num">ปลูก/บำรุง</th><th class="num">PDD</th><th class="num">VVB</th><th class="num">ลงพื้นที่</th><th class="num">ตรวจรอดตาย</th><th class="num">กองทุนชุมชน</th><th class="num">รวม AP</th></tr></thead>
+<tbody id="codeRows"></tbody>
+</table>
+</div>
+</section>
+<section class="panel table-panel" id="plotPanel">
+<div class="section-head table-head">
+<div><h2>ติดตามรายแปลง / ชุมชน</h2><p id="tableSubtitle"></p></div>
+<div class="table-actions">
+<label>เรียงตาม <select id="sort"><option value="balance">คงเหลือสูงสุด</option><option value="paid">จ่ายแล้วสูงสุด</option><option value="boq">BOQ สูงสุด</option><option value="plot">รหัสแปลง / ชุมชน</option></select></label>
+<button class="btn" id="exportCsv">Export CSV</button>
+</div>
+</div>
+<div class="empty-state" hidden="" id="plotUnavailable"></div>
+<div class="table-wrap" id="plotTableWrap">
+<table>
+<thead><tr>
+<th>รหัสโครงการ</th><th>ประเภทโครงการ</th><th>ชื่อ T-VER</th><th>TOKEN</th><th>รหัสแปลง / ชุมชน</th><th>จังหวัด</th><th class="num">พื้นที่</th><th class="num" id="boqYearHead">BOQ ปี 3</th><th>งวดล่าสุด</th><th>งวดค้าง</th><th class="num">จ่ายแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th></th>
+</tr></thead>
+<tbody id="plotRows"></tbody>
+</table>
+</div>
+</section>
+<footer><span id="sourceNote"></span><span>ยอดจ่าย BOQ ใช้ ERP AP เฉพาะงานปลูก/บำรุง; กองทุนชุมชน / PDD / VVB / Clear Advance แสดงแยกและไม่หักจาก BOQ</span></footer>
+</main>
+<div class="modal-backdrop" hidden="" id="modalBackdrop">
+<article aria-labelledby="modalTitle" aria-modal="true" class="modal" role="dialog">
+<button aria-label="ปิด" class="modal-close" id="modalClose">×</button>
+<div id="modalContent"></div>
+</article>
+</div>
+<script id="boq-saved-snapshot" type="application/json">null</script>
+<script src="baseline.js?v=20261009-workspace1"></script><script src="xlsx-reader.js?v=20261009-workspace1"></script><script src="erp-adapter.js?v=20261009-workspace1"></script><script src="dashboard.js?v=20261009-workspace1"></script><script src="workspace.js?v=20261009-workspace1"></script></body>
+</html>

@@ -1,0 +1,45 @@
+/* Upload-only entry; the dashboard below reuses ../boq/styles.css and ../boq/app.js unchanged. */
+[hidden]{display:none!important}
+.auto-topbar{align-items:center;gap:24px}
+.auto-header-actions{display:flex;align-items:center;gap:22px;flex-shrink:0}
+.auto-header-actions .btn{background:#e6f2df;color:#123c34;border:1px solid #c6dfb9}
+.created-info{display:flex;flex-direction:column;text-align:right;gap:4px;font-variant-numeric:tabular-nums}
+.created-info span{font-size:12px;color:#c6d9d2}.created-info strong{font-size:15px;color:#fff}
+.auto-shell{padding-bottom:0}
+.auto-upload{max-width:780px;margin:28px auto 36px;padding:34px;text-align:center}
+.upload-eyebrow{font-size:11px;font-weight:700;letter-spacing:2px;color:#557b69;margin-bottom:12px}
+.auto-upload h2{font-size:30px;margin:0 0 10px;letter-spacing:-.5px}
+.auto-upload>p{color:#5b7168;font-size:15px;line-height:1.8;margin:8px 0 24px}
+.auto-drop{display:flex;flex-direction:column;align-items:center;gap:13px;min-height:245px;justify-content:center;border:2px dashed #acc3b4;border-radius:12px;background:#f4f8f2;padding:22px}
+.auto-drop.dragging{border-color:#167354;background:#e3f1e6}
+.upload-symbol{font-size:30px;font-weight:500;width:48px;height:48px;border-radius:12px;background:#dfecdc;color:#205342;line-height:44px}
+.choose-primary{font-size:17px!important;padding:13px 35px!important;min-height:50px}
+.auto-drop>span:not(.upload-symbol){font-size:14px;color:#466351}.auto-drop small{font-size:12px;color:#6a7e70}
+.auto-upload .privacy-copy{font-size:12px;margin:20px 0 0;color:#607568}
+.auto-status{padding:16px 20px;background:#eaf4e7;border:1px solid #bed5b5;border-radius:8px;margin:18px 0;font-weight:600;line-height:1.7;overflow-wrap:anywhere}
+.auto-status.error{background:#fff0eb;color:#923f34;border-color:#e5b9ae}
+.auto-progress{height:5px;background:#dae6d8;overflow:hidden;border-radius:6px;margin-top:-10px;margin-bottom:18px}
+.auto-progress span{display:block;width:32%;height:100%;background:#37704c;animation:reading 1.3s infinite ease-in-out}
+@keyframes reading{from{transform:translateX(-100%)}to{transform:translateX(410%)}}
+@media(prefers-reduced-motion:reduce){.auto-progress span{animation:none;width:100%}}
+.source-strip{background:#fff;border:1px solid #d7e3d8;border-radius:10px;padding:17px 21px;margin:8px 0 10px}
+.source-strip>div{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.source-strip strong{font-size:15px;overflow-wrap:anywhere}.source-strip span{font-size:13px;color:#54715b}
+.source-strip>p{color:#196047;font-size:13px;margin:8px 0 0}
+.source-strip details{font-size:12px;color:#68796d;margin-top:9px}.source-strip summary{cursor:pointer;display:list-item}
+.source-strip pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.8 inherit;padding:10px 0;margin:0}
+.source-strip .btn{font-size:12px;padding:7px 12px}
+button:disabled{cursor:wait;opacity:.6}.is-reading #financeDashboard{opacity:.65;pointer-events:none}
+#financeDashboard{padding-top:10px}
+@media(max-width:700px){.auto-topbar{align-items:flex-start;flex-wrap:wrap}.auto-header-actions{width:100%;justify-content:space-between;flex-wrap:wrap;gap:12px}.created-info{text-align:left}.auto-upload{padding:23px 18px;margin:12px auto 20px}.auto-upload h2{font-size:25px}.auto-drop{min-height:215px}.source-strip{padding:15px}.source-strip>div{align-items:flex-start;flex-direction:column}.auto-topbar h1{font-size:27px}}
+@media print{.auto-header-actions button,.auto-status,.auto-progress,#uploadIntro,.source-strip details{display:none!important}.source-strip{break-inside:avoid}}
+@media(max-width:700px){#financeDashboard .table-head{flex-direction:column;align-items:flex-start}#financeDashboard .table-actions{flex-wrap:wrap;max-width:100%}#financeDashboard .portfolio-card>div{min-width:0}#financeDashboard .portfolio-card p{overflow-wrap:anywhere}#financeDashboard .grid-2>*{min-width:0}}
+
+
+.auto-header-actions{flex-wrap:wrap;justify-content:flex-end;flex-shrink:1}
+.auto-header-actions .save-button{background:#fff;color:#125147}
+.auto-header-actions .reset-button{background:transparent;color:#fff;border:1px solid #ffffff66}
+.created-info small{font-size:11px;color:#cee6dc;max-width:320px}
+.created-info{min-width:190px}button:disabled{cursor:not-allowed}
+@media(max-width:900px){.auto-header-actions{gap:10px}.auto-topbar{align-items:flex-start;flex-wrap:wrap}}
+@media(max-width:520px){.auto-header-actions{justify-content:flex-start}.created-info{width:100%;text-align:left}.auto-header-actions .btn{font-size:13px;padding:10px}.table-actions{flex-wrap:wrap}.bar-row{grid-template-columns:65px minmax(0,1fr) 115px}}
