@@ -16,3 +16,11 @@
 .local-issues{margin:16px 0;max-height:240px;overflow:auto}
 #localResult .inline{margin-top:16px}
 @media(max-width:640px){.local-fields{grid-template-columns:1fr}.local-sample-row{grid-template-columns:1fr;gap:1px}}
+
+/* Original Excel file creation metadata in the top-right header. */
+.heading-meta{display:flex;flex-direction:column;align-items:flex-end;gap:9px;min-width:210px}
+.excel-created-info{display:flex;flex-direction:column;gap:1px;text-align:right;border:1px solid #8ba699;border-radius:8px;padding:8px 12px;background:#ffffff0d;max-width:min(390px,100%)}
+.excel-created-info>span{font-size:12px;color:#d5e1da}
+.excel-created-info>strong{font-size:15px;line-height:1.5;font-weight:650;font-variant-numeric:tabular-nums;color:#fff}
+.excel-created-info>small{font-size:11px;color:#d5e1da;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:640px){.heading{flex-wrap:wrap}.heading-meta{width:100%;align-items:flex-start}.excel-created-info{text-align:left;max-width:100%}}
