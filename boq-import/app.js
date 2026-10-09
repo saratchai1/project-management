@@ -22,6 +22,10 @@
     state.report.inputKey===inputKey() && state.report.baseRevision===state.current?.revision;
   function invalidate(){state.generation++;state.report=null;$('report').hidden=true;$('reportEmpty').hidden=false;$('publishConsent').checked=false;refreshButtons();}
   function refreshButtons(){
+    if(staticDemo){
+      for(const id of ['preview','publish','approve','sampleAI','suggestAI','rollback'])$(id).disabled=true;
+      return;
+    }
     $('preview').disabled=state.busy||!state.uploads.length||state.uploads.some(x=>!x.profileId);
     $('publish').disabled=state.busy||!reportIsCurrent()||!$('publishConsent').checked;
     $('suggestAI').disabled=state.busy||!state.selected||!$('aiConsent').checked;
@@ -50,6 +54,7 @@
     }refreshButtons();
   }
   async function upload(files){
+    if(staticDemo) return window.BOQPublicPreview.upload(files);
     invalidate();
     if(state.uploads.length+files.length>8)throw Error('หนึ่งรอบรองรับไม่เกิน 8 ไฟล์');
     for(const file of files){
@@ -114,10 +119,15 @@
   if(staticDemo){
     state.current={revision:'PUBLIC-DEMO',data:null};
     $('revision').textContent='PUBLIC DEMO';
-    const disabledIds=['files','preview','publish','approve','sampleAI','suggestAI','rollback','history','rollbackReason','rollbackConsent','publishConsent'];
+    const disabledIds=['preview','publish','approve','sampleAI','suggestAI','rollback','history','rollbackReason','rollbackConsent','publishConsent'];
     for(const id of disabledIds){const node=$(id);if(node)node.disabled=true;}
-    const dropzone=$('dropzone');if(dropzone){dropzone.style.opacity='.55';dropzone.style.cursor='not-allowed';dropzone.onclick=e=>e.preventDefault();}
-    message('เปิด Public Demo แล้ว — ไม่ต้องใช้รหัสผ่าน; การอัปโหลด/Publish ต้องเชื่อม private backend ก่อน');
+    $('preview').closest('section.panel').hidden=true;
+    $('rollback').closest('section.panel').hidden=true;
+    $('refresh').hidden=true;
+    const steps=document.querySelectorAll('.steps span');
+    if(steps[3])steps[3].textContent='04 ดาวน์โหลดผลตรวจ';
+    window.BOQPublicPreview.init().catch(err=>message('เปิดตัวอ่าน Excel ไม่สำเร็จ: '+err.message,true));
+    message('Public Preview พร้อมใช้งาน — เลือก Excel เพื่ออ่านใน Browser; ยังไม่เปลี่ยน Dashboard');
   }else{
     task(async()=>{try{const session=await api('/api/session');state.csrf=session.csrf;await refresh();}catch(error){if(error.message!=='AUTH_REQUIRED')throw error;}});
   }
