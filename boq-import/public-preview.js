@@ -181,6 +181,7 @@
       const code=txt(val(s,r,f.cols.plotCode));
       const hasMoney=['boq','paid'].some(x=>f.cols[x]>=0&&txt(val(s,r,f.cols[x]))!=='');
       if(!code){if(hasMoney&&issues.length<25)issues.push('แถว '+(r+1)+' มียอดเงินแต่ไม่มีรหัสแปลง (อาจเป็นแถวรวม)');continue;}
+      if(/^(รวม|ยอดรวม|รวมทั้งสิ้น|total|subtotal|grandtotal)$/.test(norm(code))){issues.push('ข้ามแถวรวมที่ '+(r+1)+' — ต้องตรวจ Control Total จากต้นฉบับ');continue;}
       if(!hasMoney)continue;
       if(!/^[A-Za-z0-9ก-๙][A-Za-z0-9ก-๙()._\/\- ]{0,90}$/.test(code)){
         if(issues.length<25)issues.push('รหัสแปลงที่แถว '+(r+1)+' มีอักขระที่ไม่รองรับ');continue;
