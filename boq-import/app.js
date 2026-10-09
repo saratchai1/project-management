@@ -66,7 +66,7 @@
       result.name=file.name;state.uploads.push(result);invalidate();renderUploads();
     }invalidate();renderUploads();message('อ่านโครงสร้างแล้ว ข้อมูล Dashboard ยังไม่เปลี่ยน');
   }
-  $('files').onchange=event=>task(async()=>{await upload([...event.target.files]);event.target.value='';});
+  $('files').onchange=event=>task(async()=>{const files=[...event.target.files];try{await upload(files);}finally{event.target.value='';}});
   const drop=$('dropzone');drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('dragging');});drop.addEventListener('dragleave',()=>drop.classList.remove('dragging'));drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('dragging');task(()=>upload([...e.dataTransfer.files]));});
   function openMapping(file){
     if(state.busy)return;
