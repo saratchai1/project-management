@@ -4,9 +4,12 @@
   const $ = id => document.getElementById(id);
   const MAX_BYTES = 20 * 1024 * 1024;
   const MAX_FILES = 8;
-  const MAX_ROWS = 30000;
-  const MAX_COLS = 256;
-  const MAX_CELLS = 250000;
+  // Limits apply to actual content, never to the rectangular !ref (which includes blanks/styles).
+  const MAX_DATA_ROWS = 100000;
+  const MAX_DATA_COLS = 1024;
+  const MAX_DATA_CELLS = 1000000;
+  const MAX_SESSION_CELLS = 2000000;
+  const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
   const FIELDS = ['plotCode', 'contractNo', 'projectCode', 'boq', 'paid'];
   const LABELS = {plotCode:'รหัสแปลง/ชุมชน',contractNo:'เลขที่สัญญา',projectCode:'รหัสโครงการ',boq:'ยอด BOQ',paid:'ยอด AP สะสม'};
   const PATTERNS = {
@@ -26,12 +29,12 @@
   const norm = value => txt(value).toLowerCase().replace(/[\s()[\]._\-:\/]/g,'').replace(/[\u200b-\u200d]/g,'');
   const node = (tag,text,cls) => {const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
   const money = value => value == null ? 'ไม่ทราบ' : new Intl.NumberFormat('th-TH',{maximumFractionDigits:2}).format(value);
-  const show = (text,error=false) => {const e=$('localStatus');e.textContent=text;e.classList.toggle('error',error);};
+  const show = (text,error=false) => {for(const id of ['localStatus','message']){const e=$(id);if(e){e.textContent=text;e.classList.toggle('error',error);}}};
   const empty = e => e.replaceChildren();
   const filename = name => txt(name).slice(0,240);
   const cell = (sheet,row,col) => sheet.worksheet[XLSX.utils.encode_cell({r:row,c:col})];
   const val = (sheet,row,col) => col < 0 ? null : (sheet.rows[row]||[])[col];
-  const nonempty = row => row.some(v => txt(v) !== '');
+  const nonempty = row => Object.values(row).some(v => txt(v) !== '');
   const colName = col => XLSX.utils.encode_col(col);
   // Excel's core document properties describe creation time; never substitute upload or modification time.
   function parseCreationDate(value){
@@ -57,39 +60,60 @@
   async function readWorkbook(file) {
     if (!window.XLSX || typeof XLSX.read !== 'function') throw Error('โหลดตัวอ่าน Excel ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตและรีเฟรชหน้านี้');
     if (!/\.xlsx$/i.test(file.name) || file.size > MAX_BYTES || !file.size) throw Error('รองรับ .xlsx ที่มีข้อมูล ขนาดไม่เกิน 20 MiB ต่อไฟล์');
-    const workbook = XLSX.read(await file.arrayBuffer(),{type:'array',cellFormula:true,cellHTML:false,bookVBA:false,bookDeps:false,cellDates:false});
+    // Give the upload/progress message a chance to paint before parsing.
+    await yieldToBrowser();
+    const buffer = await file.arrayBuffer();
+    const magic = new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength));
+    if(magic.length < 4 || magic[0] !== 0x50 || magic[1] !== 0x4b || magic[2] !== 3 || magic[3] !== 4){
+      throw Error('ไฟล์นี้ไม่ใช่ .xlsx ที่อ่านได้ หรือถูกเข้ารหัสด้วยรหัสผ่าน');
+    }
+    const workbook = XLSX.read(buffer,{type:'array',cellFormula:true,cellHTML:false,bookVBA:false,bookDeps:false,cellDates:false});
     if (!workbook.SheetNames.length || workbook.SheetNames.length > 40) throw Error('จำนวน Worksheet ไม่ถูกต้องหรือมากกว่า 40 ชีต');
     const sheets = [];
+    let totalCells=0,totalRows=0;
     for (const name of workbook.SheetNames) {
-      const worksheet = workbook.Sheets[name];
-      const range = worksheet['!ref'] ? XLSX.utils.decode_range(worksheet['!ref']) : null;
-      if (!range) {sheets.push({name,worksheet,rows:[],lastRow:0,lastCol:0,nonemptyRows:0,formulaCount:0});continue;}
-      if (range.e.r >= MAX_ROWS || range.e.c >= MAX_COLS || (range.e.r+1)*(range.e.c+1) > MAX_CELLS) {
-        throw Error('Worksheet "'+name+'" ใหญ่เกินขีดจำกัดการตรวจบน Browser (30,000 แถว / 256 คอลัมน์ / 250,000 เซลล์)');
+      const source=workbook.Sheets[name];
+      if(!source || typeof source !== 'object')throw Error('ไม่พบข้อมูล Worksheet: '+name);
+      // Sparse row/column maps preserve real Excel addresses, including large empty gaps.
+      // Never iterate or allocate A1..lastRow/lastCol from !ref.
+      const worksheet=Object.create(null),rows=Object.create(null),columns=new Set();
+      let formulas=0,populatedCells=0,visited=0;
+      for(const key of Object.keys(source)){
+        if(key[0]==='!')continue;
+        if(++visited % 10000 === 0)await yieldToBrowser();
+        const entry=source[key];
+        const hasFormula=entry && typeof entry.f === 'string';
+        const hasValue=entry && entry.v != null && !(typeof entry.v === 'string' && entry.v.trim()==='');
+        if(!hasFormula && !hasValue)continue; // Do not count style-only cells or empty strings.
+        if(!/^[A-Z]{1,3}[1-9][0-9]{0,6}$/.test(key))throw Error('ตำแหน่งเซลล์ไม่ถูกต้องใน Worksheet: '+name);
+        const {r,c}=XLSX.utils.decode_cell(key);
+        if(r>=1048576 || c>=16384)throw Error('ตำแหน่งเซลล์เกินขอบเขต Excel: '+name+'!'+key);
+        if(++totalCells>MAX_DATA_CELLS)throw Error('ไฟล์มีข้อมูลจริงเกิน 1,000,000 เซลล์ (ไม่นับช่องว่าง) กรุณาแบ่งไฟล์ก่อนตรวจ');
+        if(!rows[r]){
+          rows[r]=Object.create(null);
+          if(++totalRows>MAX_DATA_ROWS)throw Error('ไฟล์มีแถวข้อมูลจริงเกิน 100,000 แถว กรุณาแบ่งไฟล์ก่อนตรวจ');
+        }
+        columns.add(c);
+        if(columns.size>MAX_DATA_COLS)throw Error('Worksheet "'+name+'" มีคอลัมน์ข้อมูลจริงเกิน 1,024 คอลัมน์');
+        worksheet[key]=entry;
+        if(hasValue)rows[r][c]=entry.v;
+        if(hasFormula)formulas++;
+        populatedCells++;
       }
-      // Read by absolute Excel coordinates. sheet_to_json shifts columns for ranges such as B4:K10.
-      const rows=Array.from({length:range.e.r+1},()=>[]);
-      for(let row=range.s.r;row<=range.e.r;row++)for(let col=range.s.c;col<=range.e.c;col++){
-        const entry=worksheet[XLSX.utils.encode_cell({r:row,c:col})];
-        if(entry&&entry.v!==undefined)rows[row][col]=entry.v;
-      }
-      let populated=0,formulas=0;
-      for (const key of Object.keys(worksheet)) {
-        if (key[0]==='!') continue;
-        const item=worksheet[key];
-        if (item && item.f !== undefined) formulas++;
-      }
-      for (const row of rows) if (row && nonempty(row)) populated++;
-      sheets.push({name,worksheet,rows,lastRow:range.e.r,lastCol:range.e.c,nonemptyRows:populated,formulaCount:formulas});
+      const rowIndices=Object.keys(rows).map(Number).sort((a,b)=>a-b);
+      const columnIndices=[...columns].sort((a,b)=>a-b);
+      const lastRow=rowIndices.at(-1)??0,lastCol=columnIndices.at(-1)??0;
+      sheets.push({name,worksheet,rows,rowIndices,columnIndices,lastRow,lastCol,
+        nonemptyRows:rowIndices.length,formulaCount:formulas,populatedCells});
     }
-    return {name:filename(file.name),size:file.size,sheets,createdDate:parseCreationDate(workbook.Props?.CreatedDate)};
+    return {name:filename(file.name),size:file.size,sheets,totalCells,createdDate:parseCreationDate(workbook.Props?.CreatedDate)};
   }
 
   function guessHeader(sheet) {
     let best=0,score=-1;
-    for (let r=0;r<Math.min(sheet.rows.length,35);r++) {
+    for (const r of sheet.rowIndices.slice(0,35)) {
       const row=sheet.rows[r]||[];
-      const n=FIELDS.filter(f=>row.some(v=>PATTERNS[f].test(norm(v)))).length;
+      const n=FIELDS.filter(f=>Object.values(row).some(v=>PATTERNS[f].test(norm(v)))).length;
       if (n>score && nonempty(row)) {score=n;best=r;}
     }
     return best;
@@ -97,7 +121,7 @@
   function guessColumns(sheet,header) {
     const cols={};
     const row=sheet.rows[header]||[];
-    for (const f of FIELDS) cols[f]=row.findIndex(v=>PATTERNS[f].test(norm(v)));
+    for (const f of FIELDS) cols[f]=sheet.columnIndices.find(c=>PATTERNS[f].test(norm(row[c])))??-1;
     return cols;
   }
   function chosenFile(){return state.files[state.active];}
@@ -138,7 +162,7 @@
     $('localName').textContent=file.name;
     const overview=$('localSheets');empty(overview);
     for (const s of file.sheets) {
-      const chip=node('span',s.name+' · '+s.nonemptyRows+' แถว'+(s.formulaCount?' · สูตร '+s.formulaCount:''));
+      const chip=node('span',s.name+' · '+s.nonemptyRows.toLocaleString('th-TH')+' แถว · '+s.columnIndices.length+' คอลัมน์ · '+s.populatedCells.toLocaleString('th-TH')+' เซลล์ข้อมูล'+(s.formulaCount?' · สูตร '+s.formulaCount:''));
       chip.className='local-chip';overview.append(chip);
     }
     const s=chosenSheet(),controls=$('localControls');empty(controls);
@@ -153,18 +177,19 @@
     controls.append(makeField('ปีดำเนินงาน (เลือกเอง)',makeSelect(years,file.year,v=>{file.year=Number(v);invalidate();})));
     const mapping=$('localMapping');empty(mapping);
     const headerValues=s.rows[file.header]||[];
-    const available=Array.from({length:Math.min(s.lastCol+1,MAX_COLS)},(_,c)=>[String(c),colName(c)+' · '+(txt(headerValues[c])||'(ไม่มีหัวคอลัมน์)')]);
+    const available=s.columnIndices.map(c=>[String(c),colName(c)+' · '+(txt(headerValues[c])||'(ไม่มีหัวคอลัมน์)')]);
     for (const f of FIELDS) {
       const sel=makeSelect([['-1','— ไม่ใช้ —'],...available],file.cols[f],v=>{file.cols[f]=Number(v);invalidate();});
       mapping.append(makeField(LABELS[f],sel));
     }
     const preview=$('localSample');empty(preview);
     let count=0;
-    for(let i=0;i<s.rows.length&&count<8;i++){
+    for(const i of s.rowIndices){
+      if(count>=8)break;
       const row=s.rows[i]||[];if(!nonempty(row))continue;
       const item=node('div',undefined,'local-sample-row');
       item.append(node('strong','แถว '+(i+1)));
-      item.append(node('span',row.slice(0,12).map((v,c)=>colName(c)+': '+txt(v).slice(0,70)).join(' | ')));
+      item.append(node('span',s.columnIndices.slice(0,12).map(c=>colName(c)+': '+txt(row[c]).slice(0,70)).join(' | ')));
       preview.append(item);count++;
     }
     if(!count) preview.textContent='ชีตนี้ไม่มีข้อมูล';
@@ -198,7 +223,8 @@
     const issues=[],records=[],seen=new Set();
     const baseline=baseIndex(),covered=new Set();
     let boqTotal=0,paidTotal=0;
-    for(let r=f.header+1;r<s.rows.length;r++){
+    for(const r of s.rowIndices){
+      if(r<=f.header)continue;
       const code=txt(val(s,r,f.cols.plotCode));
       const hasMoney=['boq','paid'].some(x=>f.cols[x]>=0&&txt(val(s,r,f.cols[x]))!=='');
       if(!code){if(hasMoney&&issues.length<25)issues.push('แถว '+(r+1)+' มียอดเงินแต่ไม่มีรหัสแปลง (อาจเป็นแถวรวม)');continue;}
@@ -287,6 +313,9 @@
       if(state.files.some(x=>x.name===file.name&&x.size===file.size))continue;
       show('กำลังอ่าน '+filename(file.name)+' ใน Browser...');
       const item=await readWorkbook(file);
+      if(state.files.reduce((sum,f)=>sum+f.totalCells,0)+item.totalCells>MAX_SESSION_CELLS){
+        throw Error('รอบนี้มีข้อมูลรวมเกิน 2,000,000 เซลล์ กรุณานำไฟล์เก่าออกก่อนเพิ่มไฟล์ใหม่');
+      }
       const sheet=item.sheets.find(s=>s.nonemptyRows>0)||item.sheets[0];
       item.selectedSheet=sheet.name;item.header=guessHeader(sheet);item.cols=guessColumns(sheet,item.header);
       item.portfolio=portfolios[0][0];item.year=3;
